@@ -412,7 +412,7 @@ wheels = [
 
 [[package]]
 name = "dbt-dagsterizer"
-version = "0.1.10"
+version = "0.1.12"
 source = { editable = "." }
 dependencies = [
     { name = "click" },

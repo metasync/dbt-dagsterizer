@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 
 def _dbt_partition_vars_from_time_window(start: datetime, end: datetime) -> dict[str, str]:
@@ -15,21 +15,24 @@ def _dbt_partition_vars_from_time_window(start: datetime, end: datetime) -> dict
     }
 
 
-def _get_dbt_vars_for_context(context) -> dict[str, str] | None:
-    try:
-        from dagster_shared.check.functions import CheckError
-    except Exception:
-        CheckError = None
+def _default_daily_window_vars() -> dict[str, str]:
+    # Fallback window for manual/non-partitioned Dagster runs against daily-partitioned assets.
+    start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    end = start + timedelta(days=1)
+    return _dbt_partition_vars_from_time_window(start, end)
 
+
+def _get_dbt_vars_for_context(context) -> dict[str, str] | None:
     try:
         time_window = context.partition_time_window
     except AttributeError:
         return None
     except Exception as e:
-        if CheckError is not None and isinstance(e, CheckError):
-            return None
+        if "Has a PartitionsDefinition" in str(e):
+            return _default_daily_window_vars()
         raise
-        return None
 
     if time_window is None:
         return None
+
+    return _dbt_partition_vars_from_time_window(time_window.start, time_window.end)

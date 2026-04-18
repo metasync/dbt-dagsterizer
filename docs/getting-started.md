@@ -20,7 +20,7 @@ To upgrade later:
 uv tool upgrade dbt-dagsterizer
 ```
 
-Use this for bootstrapping a repo from the embedded template (`project init`), managing `dagsterization.yml` (`meta ...`), and installing macros (`macros install`).
+Use this for bootstrapping a repo from the embedded template (`project init`), managing `dagsterization.yml` (`meta ...`), and syncing managed macros (`macros sync`).
 
 ### Install as a Python dependency (required for Dagster runtime)
 

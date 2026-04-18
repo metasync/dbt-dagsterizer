@@ -6,7 +6,7 @@ This is a high-level guide to the `dbt-dagsterizer` codebase: what’s public, w
 
 - Python API: `dbt_dagsterizer.api.build_definitions()`
 - CLI: `dbt_dagsterizer.cli:cli` (exposed as the `dbt-dagsterizer` console script)
-- Templates: `src/dbt_dagsterizer/project_templates/` and `src/dbt_dagsterizer/macro_templates/`
+- Templates: `src/dbt_dagsterizer/project_templates/`
 
 ## Core idea
 
@@ -24,7 +24,7 @@ At runtime (Dagster import time), the code location calls `build_definitions()`.
 - `jobs/`, `schedules/`, `sensors/`: generated orchestration constructs
 - `resources/`: external resources (for example warehouse connectivity)
 - `project_templates/`: embedded cookiecutter template for a runnable code location repo
-- `macro_templates/`: dbt macros that the CLI can install into a dbt project
+- `project_templates/.../dbt_project/macros/dbt_dagsterizer/`: dbt macros managed by template rendering and `macros sync`
 
 ## When you need to change X
 

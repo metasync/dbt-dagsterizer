@@ -12,4 +12,3 @@
     {{ target.schema }}
   {%- endif -%}
 {%- endmacro %}
-

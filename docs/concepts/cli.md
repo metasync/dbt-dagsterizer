@@ -243,17 +243,23 @@ dbt-dagsterizer meta partition-change propagator \
   --targets daily_facts_job
 ```
 
-### `macros install`
+### `macros sync`
 
-Installs the macro templates shipped with `dbt-dagsterizer` into a dbt project.
+Syncs namespaced macro templates shipped with `dbt-dagsterizer` into a dbt project at `macros/dbt_dagsterizer/`.
 
 ```bash
-dbt-dagsterizer macros install
+dbt-dagsterizer macros sync
 ```
 
 Flags:
 
-- `--force`: overwrite files if they exist with different content
+- `--force`: overwrite files if they already exist
+
+Template selection:
+
+- Uses `dbt_project/.dbt_dagsterizer_template` (rendered from the template) to determine which embedded template to use as the source of managed macros.
+- Falls back to the default template if the file is missing.
+- Override via `DBT_DAGSTERIZER_TEMPLATE` if needed.
 
 ## Why `--parse` exists
 

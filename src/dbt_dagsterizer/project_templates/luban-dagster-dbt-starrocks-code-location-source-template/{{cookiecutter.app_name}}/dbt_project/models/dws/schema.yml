@@ -3,10 +3,6 @@ version: 2
 models:
   - name: dim_customer
     description: "Customer dimension built from DWD customers. Used by downstream fact models."
-    tests:
-      - row_count_greater_than:
-          arguments:
-            min_value: 0
     columns:
       - name: customer_id
         description: "Surrogate/business key for the customer dimension (from DWD)."
@@ -20,10 +16,6 @@ models:
 
   - name: fact_customer_orders_daily
     description: "Daily customer order fact aggregated from DWD orders. One row per customer per day."
-    tests:
-      - row_count_greater_than:
-          arguments:
-            min_value: 0
     columns:
       - name: order_date
         description: "Date bucket for the fact grain."
@@ -40,10 +32,6 @@ models:
 
   - name: fact_orders_daily
     description: "Daily order fact aggregated from DWD orders. One row per day."
-    tests:
-      - row_count_greater_than:
-          arguments:
-            min_value: 0
     columns:
       - name: order_date
         description: "Date bucket for the fact grain."

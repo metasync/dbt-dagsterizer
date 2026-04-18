@@ -20,4 +20,3 @@
     {{ starrocks_layer_schema(node) }}
   {%- endif -%}
 {%- endmacro %}
-

@@ -1,5 +1,5 @@
 
-.PHONY: help setup install macros-install dev test check-db ods-test-bootstrap ods-test-append dbt-deps dbt-parse dbt-build dbt-run clean{% if cookiecutter.include_docker %} docker-up docker-down docker-ps docker-logs{% endif %}
+.PHONY: help setup install macros-sync dev test check-db ods-test-bootstrap ods-test-append dbt-deps dbt-parse dbt-build dbt-run clean{% if cookiecutter.include_docker %} docker-up docker-down docker-ps docker-logs{% endif %}
 
 
 # Load local environment variables (if present) for dbt/Dagster commands.
@@ -33,11 +33,11 @@ setup: ## Setup local development environment
 install: ## Install or update python dependencies
 	@echo "Installing dependencies..."
 	uv sync
-	$(MAKE) macros-install
+	$(MAKE) macros-sync
 
 
-macros-install: ## Install dbt macros required by this code location
-	uv run dbt-dagsterizer macros install --dbt-project-dir $(DBT_PROJECT_DIR)
+macros-sync: ## Sync dbt macros required by this code location
+	uv run dbt-dagsterizer macros sync --dbt-project-dir $(DBT_PROJECT_DIR)
 
 
 dev: ## Run Dagster webserver for local development

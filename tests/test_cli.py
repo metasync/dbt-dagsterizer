@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from dbt_dagsterizer.cli_parts.common import resolve_dir_arg
-from dbt_dagsterizer.cli_parts.macros import _install_macros
+from dbt_dagsterizer.cli_parts.macros import _DEFAULT_TEMPLATE_NAME, _sync_macros
 from dbt_dagsterizer.cli_parts.validation import (
     validate_orchestration,
     validate_orchestration_structure,
@@ -13,13 +13,15 @@ def test_resolve_dir_arg_relative(tmp_path: Path, monkeypatch):
     assert resolve_dir_arg("dbt_project") == (tmp_path / "dbt_project").resolve()
 
 
-def test_install_macros(tmp_path: Path):
+def test_sync_macros(tmp_path: Path):
     dbt_project = tmp_path / "dbt_project"
     dbt_project.mkdir(parents=True)
 
-    installed, macros_dir = _install_macros(dbt_project_path=dbt_project, force=False)
+    synced, macros_dir = _sync_macros(
+        dbt_project_path=dbt_project, template_name=_DEFAULT_TEMPLATE_NAME, force=False
+    )
     assert macros_dir.exists()
-    assert installed > 0
+    assert synced > 0
     assert any(macros_dir.rglob("*.sql"))
 
 

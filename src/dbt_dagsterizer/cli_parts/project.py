@@ -155,6 +155,7 @@ def build_project_group() -> click.Group:
                 overwrite_if_exists=force,
             )
 
-        click.echo(str(output_dir / app_name))
+        project_root = output_dir / app_name
+        click.echo(str(project_root))
 
     return project

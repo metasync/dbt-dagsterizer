@@ -32,7 +32,9 @@ def test_project_init_renders_into_output_dir(tmp_path: Path):
     assert (project_root / "pyproject.toml").exists()
     assert (project_root / "dbt_project" / "dbt_project.yml").exists()
     assert list((project_root / "dbt_project" / "models").rglob("*.sql")) == []
-    assert not (project_root / "dbt_project" / "macros").exists()
+    assert (project_root / "dbt_project" / ".dbt_dagsterizer_template").exists()
+    assert (project_root / "dbt_project" / "macros" / "dbt_dagsterizer").exists()
+    assert any((project_root / "dbt_project" / "macros" / "dbt_dagsterizer").rglob("*.sql"))
 
     env_example = (project_root / ".env.example").read_text(encoding="utf-8")
     assert "DAGSTER_MAX_CONCURRENT_RUNS=2" in env_example

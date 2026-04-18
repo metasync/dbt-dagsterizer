@@ -6,6 +6,22 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 
 ## [Unreleased]
 
+## [0.1.13] - 2026-04-18
+
+### Added
+
+- Added a template fingerprint file (`dbt_project/.dbt_dagsterizer_template`) to allow `macros sync` to select the correct embedded template without CLI flags.
+
+### Changed
+
+- Managed dbt macros now live inside the embedded template under `dbt_project/macros/dbt_dagsterizer/` so freshly rendered projects include required macros by default.
+- Replaced the `macros install` workflow with `macros sync`, which syncs the packaged managed macros into `macros/dbt_dagsterizer/` in a dbt project.
+
+### Removed
+
+- Removed the example `row_count_greater_than` test macro and its references from the sample dbt project.
+- Removed the legacy `macro_templates/` directory; managed macros are now sourced from the embedded template.
+
 ## [0.1.12] - 2026-04-16
 
 ### Fixed

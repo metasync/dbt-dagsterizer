@@ -9,6 +9,13 @@ Notes:
 
 - Examples may contain cookiecutter variables (for example `{{cookiecutter.package_name}}`). In rendered projects, those are replaced with real values.
 - Rendered projects do not ship template documentation; their `README.md` links back to this directory.
+- Rendered projects include basic OpenTelemetry bootstrap; export is controlled by `OTEL_*` environment variables.
+
+## GitOps (Luban CI)
+
+In Luban CI, Dagster code location GitOps templates typically inject OTEL settings via a `dagster-observability` ConfigMap. Export is disabled unless you set:
+
+- `OTEL_TRACES_EXPORTER=otlp` (and optionally `OTEL_METRICS_EXPORTER=otlp`)
 
 ## Template options
 

@@ -12,6 +12,7 @@ from ..manifest_inputs import (
     should_refresh_manifest,
     write_manifest_inputs,
 )
+from ..otel import otel_child_span
 
 
 def manifest_path(dbt_project_dir: Path) -> Path:
@@ -32,17 +33,25 @@ def run_dbt_parse(*, dbt_project_dir: Path, dbt_profiles_dir: Path, dbt_target: 
         "DBT_PROFILES_DIR": str(dbt_profiles_dir),
     }
     env.update(dotenv_overrides_for_dbt_project(dbt_project_dir=dbt_project_dir))
-    with temporary_env(env):
-        target_path = dbt_project_dir / "target"
-        target_path.mkdir(parents=True, exist_ok=True)
-        cli = DbtCliResource(project_dir=str(dbt_project_dir), profiles_dir=str(dbt_profiles_dir), target=dbt_target)
-        if _should_run_deps(dbt_project_dir):
-            cli.cli(["deps", "--quiet"], target_path=target_path).wait()
-        cli.cli(["parse", "--quiet"], target_path=target_path).wait()
-        write_manifest_inputs(
-            dbt_project_dir=dbt_project_dir,
-            inputs=current_manifest_inputs(dbt_project_dir=dbt_project_dir, dbt_target=dbt_target),
-        )
+    with otel_child_span(
+        "dbt.manifest.prepare",
+        attributes={"dbt.target": dbt_target},
+    ):
+        with temporary_env(env):
+            target_path = dbt_project_dir / "target"
+            target_path.mkdir(parents=True, exist_ok=True)
+            cli = DbtCliResource(
+                project_dir=str(dbt_project_dir),
+                profiles_dir=str(dbt_profiles_dir),
+                target=dbt_target,
+            )
+            if _should_run_deps(dbt_project_dir):
+                cli.cli(["deps", "--quiet"], target_path=target_path).wait()
+            cli.cli(["parse", "--quiet"], target_path=target_path).wait()
+            write_manifest_inputs(
+                dbt_project_dir=dbt_project_dir,
+                inputs=current_manifest_inputs(dbt_project_dir=dbt_project_dir, dbt_target=dbt_target),
+            )
 
 
 def ensure_manifest(*, dbt_project_dir: Path, dbt_profiles_dir: Path, dbt_target: str) -> Path:

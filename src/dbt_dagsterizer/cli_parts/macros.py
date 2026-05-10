@@ -8,7 +8,6 @@ import click
 
 from .common import resolve_dir_arg
 
-
 _DEFAULT_TEMPLATE_NAME = "luban-dagster-dbt-starrocks-code-location-source-template"
 _TEMPLATE_MARKER_NAME = ".dbt_dagsterizer_template"
 

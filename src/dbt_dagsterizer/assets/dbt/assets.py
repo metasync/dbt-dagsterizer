@@ -16,6 +16,12 @@ from ...orchestration_config import (
 from ...orchestration_config import (
     load_or_create as load_orch,
 )
+from ...otel import (
+    otel_dagster_transaction_info,
+    otel_record_exception,
+    otel_span,
+    otel_transaction_span,
+)
 from ...resources.dbt import get_dbt_project_dir
 from ..sources.automation import load_automation_observable_sources
 from .prepare import prepare_manifest_if_missing
@@ -66,19 +72,32 @@ def get_dbt_assets():
         dagster_dbt_translator=translator,
     )
     def _dbt_assets(context, dbt: DbtCliResource):
-        dbt_vars = _get_dbt_vars_for_context(context)
-        dbt_args = ["build"]
-        if dbt_vars:
-            dbt_args += ["--vars", json.dumps(dbt_vars)]
-
-        try:
-            yield from dbt.cli(dbt_args, context=context).stream()
-        except DagsterDbtCliRuntimeError as e:
-            retry_number = int(getattr(context, "retry_number", 0) or 0)
-            if _should_retry_dbt_cli_error(message=str(e), retry_number=retry_number):
-                context.log.warning("dbt invocation failed with 'already exists'; requesting a retry")
-                raise dg.RetryRequested(seconds_to_wait=2) from e
-            raise
+        retry_number = int(getattr(context, "retry_number", 0) or 0)
+        tx_span_name, _, tx_attrs = otel_dagster_transaction_info(context)
+        tx_attrs["dagster.retry_number"] = retry_number
+        with otel_transaction_span(tx_span_name, attributes=tx_attrs):
+            with otel_span("dbt.vars"):
+                dbt_vars = _get_dbt_vars_for_context(context)
+            dbt_args = ["build"]
+            if dbt_vars:
+                dbt_args += ["--vars", json.dumps(dbt_vars)]
+            with otel_span(
+                "dbt.cli",
+                attributes={
+                    "dbt.command": dbt_args[0] if dbt_args else "",
+                    "dbt.target": dbt_target,
+                },
+            ) as span:
+                try:
+                    yield from dbt.cli(dbt_args, context=context).stream()
+                except DagsterDbtCliRuntimeError as e:
+                    otel_record_exception(span, e)
+                    if _should_retry_dbt_cli_error(message=str(e), retry_number=retry_number):
+                        context.log.warning(
+                            "dbt invocation failed with 'already exists'; requesting a retry"
+                        )
+                        raise dg.RetryRequested(seconds_to_wait=2) from e
+                    raise
 
     _dbt_assets_def = _dbt_assets
     return _dbt_assets_def

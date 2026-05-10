@@ -75,7 +75,8 @@ Renders a runnable Dagster + dbt (StarRocks) code-location repo using the embedd
 ```bash
 dbt-dagsterizer project init \
   --output-dir . \
-  --project-name "My App" \
+  --project-name "Orders Analytics" \
+  --namespace "metasync" \
   --author-name "You" \
   --author-email "you@example.com"
 ```
@@ -84,6 +85,7 @@ Notes:
 
 - `--project-name` (or `--name`) is required.
 - `app_name` and `package_name` are derived automatically from `--project-name`.
+- `--namespace` is optional and is used as a prefix for generated defaults (for example OTEL service naming and StarRocks DB names).
 - `--include-docker` is optional; when enabled, includes a local StarRocks docker-compose file and docker-related Make targets.
 - `--output-dir` controls where the project directory is created.
 - `--force` overwrites an existing output directory.

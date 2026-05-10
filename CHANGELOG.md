@@ -6,6 +6,26 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-05-10
+
+### Added
+
+- Added OpenTelemetry (OTEL) bootstrap support and safe-by-default exporter configuration controlled by `OTEL_*` environment variables.
+- Added Dagster-aware OTEL transaction naming (schedule/sensor/backfill/job/asset-job) and improved span structure for dbt execution.
+- Added `--namespace` to `project init` to align rendered code locations with Luban CI project/app naming conventions.
+- Added template defaults for namespace-aware OTEL service naming and StarRocks database naming.
+- Added local development and Elastic APM smoke-test documentation for OTEL trace export.
+
+### Changed
+
+- Improved OTLP HTTP endpoint handling for Elastic APM by normalizing endpoints and ensuring OTLP HTTP signal paths are correct.
+- Improved observability docs and template `.env.example` to make OTEL configuration self-explanatory.
+
+### Fixed
+
+- Fixed OTEL tagging for non-partitioned Dagster runs by safely handling partition context access.
+- Fixed stray top-level “transactions” in Elastic APM by ensuring helper spans are created as children under the transaction span.
+
 ## [0.1.13] - 2026-04-18
 
 ### Added

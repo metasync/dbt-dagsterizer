@@ -16,8 +16,8 @@ def _default_dagster_version() -> str:
         return "1.12.19"
 
 
-def _normalize_app_name(project_name: str) -> str:
-    """Normalize a human-friendly project name into a Python-safe identifier.
+def _normalize_app_name(name: str) -> str:
+    """Normalize a human-friendly name into a Python-safe identifier.
 
     Rules:
     - Lowercase.
@@ -26,7 +26,7 @@ def _normalize_app_name(project_name: str) -> str:
     - Strip leading/trailing `_`.
     - If the result starts with a digit, prefix with `app_`.
     """
-    name = project_name.strip().lower()
+    name = name.strip().lower()
     name = re.sub(r"[^0-9a-zA-Z]+", "_", name)
     name = re.sub(r"_+", "_", name).strip("_")
     if not name:
@@ -34,6 +34,19 @@ def _normalize_app_name(project_name: str) -> str:
     if name[0].isdigit():
         name = f"app_{name}"
     return name
+
+
+def _normalize_namespace(namespace: str) -> str:
+    ns = namespace.strip().lower()
+    if not ns:
+        return ""
+    ns = re.sub(r"[^0-9a-zA-Z]+", "_", ns)
+    ns = re.sub(r"_+", "_", ns).strip("_")
+    if not ns:
+        raise click.ClickException("--namespace must not be empty after normalization")
+    if ns[0].isdigit():
+        ns = f"ns_{ns}"
+    return ns
 
 
 def _print_template_names() -> None:
@@ -77,7 +90,13 @@ def build_project_group() -> click.Group:
         "--project-name",
         "--name",
         required=True,
-        help="Human-friendly project name (used to derive app/package names)",
+        help="Human-friendly app name (used to derive code-location/package names)",
+    )
+    @click.option(
+        "--namespace",
+        default="",
+        show_default=True,
+        help="Optional namespace (Luban project). Used for OTEL service naming and StarRocks DB prefixes.",
     )
     @click.option(
         "--dagster-version",
@@ -98,6 +117,7 @@ def build_project_group() -> click.Group:
         output_dir: Path,
         force: bool,
         project_name: str,
+        namespace: str,
         dagster_version: str,
         default_env: str,
         code_location_port: str,
@@ -123,6 +143,7 @@ def build_project_group() -> click.Group:
         package_name_value = app_name
 
         project_name_value = project_name
+        namespace_value = _normalize_namespace(namespace)
 
         dagster_version_value = dagster_version.strip()
         if not dagster_version_value:
@@ -135,6 +156,7 @@ def build_project_group() -> click.Group:
             "project_name": project_name_value,
             "app_name": app_name,
             "package_name": package_name_value,
+            "namespace": namespace_value,
             "dagster_version": dagster_version_value,
             "default_env": default_env,
             "code_location_port": str(code_location_port),

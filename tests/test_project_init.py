@@ -51,3 +51,29 @@ def test_project_init_renders_into_output_dir(tmp_path: Path):
     assert 'os.environ.setdefault("DBT_PROJECT_DIR", str(DBT_PROJECT_DIR))' in content
     assert 'os.environ.setdefault("DBT_PROFILES_DIR", str(DBT_PROJECT_DIR))' in content
     assert "dbt_project_dir=DBT_PROJECT_DIR" in content
+
+
+def test_project_init_namespace_affects_env_defaults(tmp_path: Path):
+    runner = CliRunner()
+    out_dir = tmp_path / "out"
+
+    result = runner.invoke(
+        cli,
+        [
+            "project",
+            "init",
+            "--output-dir",
+            str(out_dir),
+            "--project-name",
+            "Demo App",
+            "--namespace",
+            "Demo Project",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+
+    project_root = out_dir / "demo_app"
+    env_example = (project_root / ".env.example").read_text(encoding="utf-8")
+    assert "OTEL_SERVICE_NAME=demo_project/demo_app" in env_example
+    assert "service.namespace=demo_project" in env_example
+    assert "STARROCKS_DWS_DB=demo_project_demo_app_dws_" in env_example

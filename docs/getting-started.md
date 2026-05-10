@@ -68,7 +68,8 @@ Render a new code-location project (only `--project-name`/`--name` is required; 
 ```bash
 dbt-dagsterizer project init \
   --output-dir . \
-  --project-name "My App" \
+  --project-name "Orders Analytics" \
+  --namespace "metasync" \
   --author-name "You" \
   --author-email "you@example.com"
 ```
@@ -76,7 +77,7 @@ dbt-dagsterizer project init \
 To include sample dbt models in the rendered project:
 
 ```bash
-dbt-dagsterizer project init --output-dir . --project-name "My App" --include-sample-dbt-project
+dbt-dagsterizer project init --output-dir . --project-name "Orders Analytics" --namespace "metasync" --include-sample-dbt-project
 ```
 
 ## Quick start (Python)

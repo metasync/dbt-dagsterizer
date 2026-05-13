@@ -161,9 +161,17 @@ select
   customer_id,
   first_name,
   last_name,
+  {% if is_incremental() %}
+  {{ base_expr }} as updated_at,
+  {% else %}
   hours_sub(date_trunc('hour', {{ base_expr }}), cast((customer_id * 13) % {{ total_hours }} as int)) as updated_at,
+  {% endif %}
   {{ base_expr }} as ods_created_at,
+  {% if is_incremental() %}
+  {{ base_expr }} as ods_updated_at
+  {% else %}
   hours_sub(date_trunc('hour', {{ base_expr }}), cast((customer_id * 13) % {{ total_hours }} as int)) as ods_updated_at
+  {% endif %}
 from named
 
 {% endif %}

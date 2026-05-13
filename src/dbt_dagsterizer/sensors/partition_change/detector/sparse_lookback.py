@@ -121,7 +121,7 @@ def _as_sql_date(value: date) -> str:
     return value.strftime("%Y-%m-%d")
 
 
-def _expand_impacted_dates(dates: set[date], impact_range: SparseLookbackImpactRange | None) -> set[date]:
+def expand_impacted_dates(dates: set[date], impact_range: SparseLookbackImpactRange | None) -> set[date]:
     if not dates or impact_range is None:
         return dates
 
@@ -166,4 +166,53 @@ def detect_changed_partition_dates(
             continue
         dates.add(date.fromisoformat(str(v)))
 
-    return _expand_impacted_dates(dates, meta.impact_range)
+    return expand_impacted_dates(dates, meta.impact_range)
+
+
+def detect_partition_max_watermarks(
+    *,
+    starrocks,
+    meta: SparseLookbackMeta,
+    window_start: date,
+    window_end: date,
+) -> dict[date, datetime]:
+    partition_date_expr = f"CAST(({meta.partition_date_expr}) AS DATE)"
+    sql = "\n".join(
+        [
+            "SELECT",
+            f"  {partition_date_expr} AS partition_date,",
+            f"  MAX({meta.updated_at_expr}) AS max_updated_at",
+            f"FROM {meta.detect_relation}",
+            "WHERE 1=1",
+            f"  AND {partition_date_expr} >= '{_as_sql_date(window_start)}'",
+            f"  AND {partition_date_expr} <= '{_as_sql_date(window_end)}'",
+            "GROUP BY 1",
+            "ORDER BY 1",
+        ]
+    )
+
+    rows = starrocks.query_rows(sql)
+    out: dict[date, datetime] = {}
+    for row in rows:
+        if not row or len(row) < 2:
+            continue
+        partition_value = row[0]
+        watermark_value = row[1]
+        if partition_value is None or watermark_value is None:
+            continue
+
+        if isinstance(partition_value, date) and not isinstance(partition_value, datetime):
+            d = partition_value
+        elif isinstance(partition_value, datetime):
+            d = partition_value.date()
+        else:
+            d = date.fromisoformat(str(partition_value))
+
+        if isinstance(watermark_value, datetime):
+            w = watermark_value
+        else:
+            w = datetime.fromisoformat(str(watermark_value))
+
+        out[d] = w
+
+    return out

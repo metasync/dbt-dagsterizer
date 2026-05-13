@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import os
+from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Generator
 
 
 @dataclass(frozen=True)
@@ -13,7 +14,8 @@ class StarRocksClient:
     password: str
     connect_timeout: int = 10
 
-    def query_scalar(self, sql: str) -> Any:
+    @contextmanager
+    def _connection(self) -> Generator[Any, None, None]:
         import pymysql
 
         connection = pymysql.connect(
@@ -27,33 +29,30 @@ class StarRocksClient:
             autocommit=True,
         )
         try:
+            yield connection
+        finally:
+            connection.close()
+
+    def query_scalar(self, sql: str) -> Any:
+        with self._connection() as connection:
             with connection.cursor() as cursor:
                 cursor.execute(sql)
                 row = cursor.fetchone()
                 return row[0] if row else None
-        finally:
-            connection.close()
 
     def query_first_column(self, sql: str) -> list[Any]:
-        import pymysql
-
-        connection = pymysql.connect(
-            host=self.host,
-            port=self.port,
-            user=self.user,
-            password=self.password,
-            connect_timeout=self.connect_timeout,
-            read_timeout=self.connect_timeout,
-            write_timeout=self.connect_timeout,
-            autocommit=True,
-        )
-        try:
+        with self._connection() as connection:
             with connection.cursor() as cursor:
                 cursor.execute(sql)
                 rows = cursor.fetchall()
                 return [row[0] for row in rows]
-        finally:
-            connection.close()
+
+    def query_rows(self, sql: str) -> list[tuple[Any, ...]]:
+        with self._connection() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(sql)
+                rows = cursor.fetchall()
+                return list(rows)
 
 
 def make_starrocks_resource() -> StarRocksClient:
@@ -63,4 +62,3 @@ def make_starrocks_resource() -> StarRocksClient:
         user=os.getenv("STARROCKS_USER", "root"),
         password=os.getenv("STARROCKS_PASSWORD", ""),
     )
-

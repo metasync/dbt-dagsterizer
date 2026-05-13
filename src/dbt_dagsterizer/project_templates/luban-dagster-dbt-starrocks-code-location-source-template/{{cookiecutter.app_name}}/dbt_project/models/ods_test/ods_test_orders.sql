@@ -92,6 +92,9 @@ select
       end
     )
   ) as order_datetime,
+  {% if is_incremental() %}
+  {{ base_expr }} as updated_at,
+  {% else %}
   hours_sub(
     date_trunc('hour', {{ base_expr }}),
     day_offset * 24 + (
@@ -102,7 +105,11 @@ select
       end
     )
   ) as updated_at,
+  {% endif %}
   {{ base_expr }} as ods_created_at,
+  {% if is_incremental() %}
+  {{ base_expr }} as ods_updated_at
+  {% else %}
   hours_sub(
     date_trunc('hour', {{ base_expr }}),
     day_offset * 24 + (
@@ -113,6 +120,7 @@ select
       end
     )
   ) as ods_updated_at
+  {% endif %}
 from enriched
 
 {% endif %}

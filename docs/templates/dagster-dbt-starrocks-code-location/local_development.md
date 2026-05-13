@@ -103,6 +103,10 @@ Notes:
 
 - `OTEL_METRICS_EXPORTER` can be left as `none`. This project currently focuses on spans/traces; APM UI also provides service KPIs derived from traces.
 - When using `http/protobuf`, the exporter sends data to OTLP HTTP paths (`/v1/traces`, `/v1/metrics`). dbt-dagsterizer auto-appends the correct path if you provide a base URL with no path.
+- dbt-dagsterizer can optionally emit additional child spans under `dbt.cli` based on dbt `target/run_results.json` (slow models/tests breakdown). Controls:
+  - `LUBAN_OTEL_DBT_RUN_RESULTS_MODE=spans|events|none` (default: `spans`): choose child spans, span events, or disable the feature.
+  - `LUBAN_OTEL_DBT_RUN_RESULTS_TOP_N=20`: how many slowest nodes to include (failures are always included).
+  - `LUBAN_OTEL_DBT_RUN_RESULTS_MIN_SECONDS=0`: only include nodes whose `execution_time` is at least this many seconds.
 
 #### 2) Optional: configure token auth (if your APM endpoint requires it)
 

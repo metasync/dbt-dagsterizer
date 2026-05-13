@@ -35,7 +35,7 @@ def test_partition_change_sensor_skips_on_missing_database(monkeypatch):
     def _raise(*_args, **_kwargs):
         raise Exception("Unknown database 'ods'")
 
-    monkeypatch.setattr(factory, "detect_changed_partition_dates", _raise)
+    monkeypatch.setattr(factory, "detect_partition_max_watermarks", _raise)
 
     sensors = factory.build_dbt_partition_change_sensors(
         specs=[

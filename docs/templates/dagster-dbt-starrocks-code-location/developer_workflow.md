@@ -171,6 +171,44 @@ Defaults:
 - `minimum_interval_seconds`: `60`
 - `name`: `<model>_partition_change_sensor`
 
+Notes:
+
+- Detectors dedupe per-partition using a watermark cursor (max(`updated_at_expr`) within the detector window). A partition is scheduled only when its watermark increases compared to the cursor.
+- The sensor cursor stores a per-partition watermark map. If you change detector logic/config and want a fresh evaluation, reset the sensor cursor in Dagster.
+
+Optional: impact range
+
+`impact` expands a detected partition into neighbor partitions to re-materialize. This is useful when a late arrival in one partition can affect adjacent partitions (for example windowed aggregations).
+
+```yaml
+partition_change:
+  detectors:
+    - model: orders
+      enabled: true
+      lookback_days: 7
+      offset_days: 1
+      detect_source:
+        source: ods
+        table: orders
+      partition_date_expr: order_datetime
+      updated_at_expr: updated_at
+      impact:
+        type: range
+        start_offset_days: -1
+        end_offset_days: 2
+```
+
+This example schedules `D-1..D+2` when `D` is detected as changed (clamped to the detector window).
+
+Concrete example (real-world)
+
+If a daily-partitioned model computes rolling metrics (for example “7-day active customers ending on D” or “7-day revenue ending on D”), then partition `D` typically depends on source data from `D-6..D`. A late arrival for day `D-3` changes the correct results for `D-3`, `D-2`, `D-1`, … up through `D+3`. In that case, configure:
+
+- `start_offset_days: 0`
+- `end_offset_days: 6`
+
+to re-materialize `D..D+6` whenever `D` changes.
+
 ### Propagation
 
 Declare propagation on the upstream model.

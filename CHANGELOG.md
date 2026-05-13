@@ -6,7 +6,7 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 
 ## [Unreleased]
 
-## [0.2.0] - 2026-05-10
+## [0.2.0] - 2026-05-13
 
 ### Added
 
@@ -15,16 +15,23 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 - Added `--namespace` to `project init` to align rendered code locations with Luban CI project/app naming conventions.
 - Added template defaults for namespace-aware OTEL service naming and StarRocks database naming.
 - Added local development and Elastic APM smoke-test documentation for OTEL trace export.
+- Added optional dbt `run_results.json` breakdown telemetry to emit per-node child spans or span events under the `dbt.cli` span (controlled by `LUBAN_OTEL_DBT_RUN_RESULTS_*`).
+- Added watermark-based dedupe for partition-change detectors (per-partition cursor + `run_key` includes partition watermark) to avoid repeatedly scheduling the same partitions under backlog.
+- Added StarRocks client row query helper and shared connection helper for reuse across query methods.
+- Added documentation for detector `impact` range configuration and real-world examples.
 
 ### Changed
 
 - Improved OTLP HTTP endpoint handling for Elastic APM by normalizing endpoints and ensuring OTLP HTTP signal paths are correct.
 - Improved observability docs and template `.env.example` to make OTEL configuration self-explanatory.
+- Changed the template ODS test append behavior so incremental appends set `updated_at`/`ods_updated_at` to “now”, enabling partition-change detectors that use `updated_at_expr`.
+- Changed default `daily_at` schedule preset to target yesterday (`partition_offset_days=1`) to avoid scheduling partitions that do not exist yet.
 
 ### Fixed
 
 - Fixed OTEL tagging for non-partitioned Dagster runs by safely handling partition context access.
 - Fixed stray top-level “transactions” in Elastic APM by ensuring helper spans are created as children under the transaction span.
+- Fixed `impact`/impact range behavior for partition-change detectors when using watermark-based dedupe by restoring neighbor-partition expansion and clamping to the detector window.
 
 ## [0.1.13] - 2026-04-18
 

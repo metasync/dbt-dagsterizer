@@ -25,11 +25,10 @@ def daily_at(
         "cron_schedule": cron,
         "job_name": job_name,
         "partition_type": "daily",
-        "partition_offset_days": 0,
+        "partition_offset_days": 1,
         "partition_lookback_days": lookback_days,
         "partition_offset_hours": 0,
         "partition_lookback_hours": 0,
         "enabled": enabled,
         "dedupe_across_ticks": dedupe_across_ticks,
     }
-

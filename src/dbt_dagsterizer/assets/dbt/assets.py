@@ -6,6 +6,7 @@ import dagster as dg
 from dagster_dbt import DbtCliResource, DbtProject, dbt_assets
 from dagster_dbt.errors import DagsterDbtCliRuntimeError
 
+from ...dbt.run_results import add_run_results_telemetry
 from ...orchestration_config import (
     default_orchestration_path,
     resolve_orchestration_path,
@@ -98,6 +99,14 @@ def get_dbt_assets():
                         )
                         raise dg.RetryRequested(seconds_to_wait=2) from e
                     raise
+                finally:
+                    add_run_results_telemetry(
+                        run_results_path=dbt_project_dir / "target" / "run_results.json",
+                        manifest_path=dbt_project_dir / "target" / "manifest.json",
+                        parent_span_attributes={
+                            "dbt.target": dbt_target,
+                        },
+                    )
 
     _dbt_assets_def = _dbt_assets
     return _dbt_assets_def

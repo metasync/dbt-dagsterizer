@@ -1,5 +1,7 @@
 from dagster import define_asset_job
 
+from ...k8s_tags import with_luban_run_k8s_config_tag
+
 
 def get_observe_sources_job():
     from ...assets.dbt.assets import get_dbt_assets
@@ -17,4 +19,5 @@ def get_observe_sources_job():
     return define_asset_job(
         name="observe_sources_job",
         selection=observable_source_assets,
+        tags=with_luban_run_k8s_config_tag(None),
     )

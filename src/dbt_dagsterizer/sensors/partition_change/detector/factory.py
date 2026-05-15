@@ -8,7 +8,11 @@ import dagster as dg
 from ....assets.dbt.prepare import prepare_manifest_if_missing
 from ....jobs.dbt.jobs import get_dbt_jobs_by_name
 from .dbt_manifest import load_manifest
-from .sparse_lookback import detect_partition_max_watermarks, expand_impacted_dates, parse_sparse_lookback_meta
+from .sparse_lookback import (
+    detect_partition_max_watermarks,
+    expand_impacted_dates,
+    parse_sparse_lookback_meta,
+)
 
 
 def _parse_legacy_cursor_ts(cursor: str | None) -> datetime | None:

@@ -6,6 +6,12 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-05-15
+
+### Added
+
+- Added Kubernetes run pod environment injection via the per-job `dagster-k8s/config` tag, controlled by `LUBAN_RUN_ENV_CONFIGMAP` and `LUBAN_RUN_ENV_SECRET`.
+
 ## [0.2.0] - 2026-05-13
 
 ### Added

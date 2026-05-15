@@ -58,6 +58,23 @@ defs = build_definitions(dbt_project_dir="./dbt_project")
 
 If the project has no dbt models yet (no `models/**/*.sql`), `build_definitions()` still returns a minimal, always-loadable `Definitions`.
 
+## Kubernetes run pod env injection
+
+When using Dagster’s `K8sRunLauncher`, runs execute in separate Kubernetes Job pods. If your Dagster code-location Deployment uses `envFrom` (for example a per-code-location ConfigMap/Secret containing DBT/StarRocks credentials), those variables do not automatically propagate into run pods.
+
+To inject a code-location ConfigMap/Secret into run pods created by jobs defined in `dbt-dagsterizer`, set these environment variables on the code server Deployment:
+
+- `LUBAN_RUN_ENV_CONFIGMAP={{app_name}}-config` (optional)
+- `LUBAN_RUN_ENV_SECRET={{app_name}}-secret` (optional)
+
+This adds a per-job `dagster-k8s/config` tag that configures `container_config.envFrom` for the run pod container. If both variables are unset/empty, no tag is added.
+
+Notes:
+
+- The referenced ConfigMap/Secret must exist in the same Kubernetes namespace where the run pod is launched.
+- If you explicitly set a `dagster-k8s/config` tag on a job, it takes precedence over this env-based injection.
+- If you use an executor that launches steps in their own pods (for example `k8s_job_executor`), job-level configuration may not apply to step pods.
+
 ## Development
 
 This section is for developing `dbt-dagsterizer` itself. If you are using it in another repo, start with the CLI install instructions or add it as a dependency in your Dagster code location.

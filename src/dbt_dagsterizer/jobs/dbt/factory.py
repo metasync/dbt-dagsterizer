@@ -4,6 +4,7 @@ import dagster as dg
 from dagster import AssetKey, AssetSelection, define_asset_job
 
 from ...assets.dbt.vars import _get_dbt_vars_for_context
+from ...k8s_tags import with_luban_run_k8s_config_tag
 from ...partitions import get_daily_partitions_def
 from ...resources.dbt import get_dbt_project_dir
 
@@ -58,7 +59,11 @@ def _build_dbt_cli_job(job_spec):
             context.log.info(str(event))
         invocation.wait()
 
-    @dg.job(name=job_name, partitions_def=partitions_def)
+    @dg.job(
+        name=job_name,
+        partitions_def=partitions_def,
+        tags=with_luban_run_k8s_config_tag(job_spec.get("tags")),
+    )
     def _job():
         _run()
 
@@ -91,6 +96,7 @@ def build_dbt_asset_jobs(job_specs):
                 name=name,
                 selection=selection,
                 partitions_def=partitions_def,
+                tags=with_luban_run_k8s_config_tag(job_spec.get("tags")),
             )
         elif job_type == "dbt_cli":
             jobs_by_name[name] = _build_dbt_cli_job(job_spec)

@@ -8,7 +8,9 @@ import dagster as dg
 
 def test_partition_change_sensor_applies_impact_range(monkeypatch):
     from dbt_dagsterizer.sensors.partition_change.detector import factory
-    from dbt_dagsterizer.sensors.partition_change.detector.sparse_lookback import SparseLookbackImpactRange
+    from dbt_dagsterizer.sensors.partition_change.detector.sparse_lookback import (
+        SparseLookbackImpactRange,
+    )
 
     @dg.op
     def noop():

@@ -6,6 +6,10 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 
 ## [Unreleased]
 
+### Added
+
+- Added a root Makefile with `build` / `publish` targets for packaging and publishing via `uv`.
+
 ## [0.2.1] - 2026-05-15
 
 ### Added

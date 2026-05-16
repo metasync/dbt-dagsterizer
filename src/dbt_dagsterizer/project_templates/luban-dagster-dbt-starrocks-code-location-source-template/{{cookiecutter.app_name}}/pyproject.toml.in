@@ -12,7 +12,11 @@ dependencies = [
     "dagster-dbt",
     "dagster-postgres",
     "dagster-k8s",
+{% if cookiecutter.dbt_dagsterizer_version %}
+    "dbt-dagsterizer~={{cookiecutter.dbt_dagsterizer_version}}",
+{% else %}
     "dbt-dagsterizer",
+{% endif %}
     "dbt-core>=1.9,<2",
     "dbt-starrocks>=1.9,<2",
     "opentelemetry-sdk>=1.25,<2",

@@ -16,6 +16,13 @@ def _default_dagster_version() -> str:
         return "1.12.19"
 
 
+def _default_dbt_dagsterizer_version() -> str:
+    try:
+        return importlib.metadata.version("dbt-dagsterizer")
+    except importlib.metadata.PackageNotFoundError:
+        return ""
+
+
 def _normalize_app_name(name: str) -> str:
     """Normalize a human-friendly name into a Python-safe identifier.
 
@@ -104,6 +111,19 @@ def build_project_group() -> click.Group:
         show_default=True,
         help="Dagster version pinned into the rendered project's dependencies.",
     )
+    @click.option(
+        "--dbt-dagsterizer-version",
+        default=None,
+        show_default="installed version (if available)",
+        help="Pin dbt-dagsterizer in the rendered project's dependencies. Defaults to the installed dbt-dagsterizer version if available.",
+    )
+    @click.option(
+        "--no-pin-dbt-dagsterizer",
+        is_flag=True,
+        default=False,
+        show_default=True,
+        help="Do not pin dbt-dagsterizer in the rendered project's dependencies (mutually exclusive with --dbt-dagsterizer-version).",
+    )
     @click.option("--default-env", default="development", show_default=True)
     @click.option("--code-location-port", default="3000", show_default=True)
     @click.option("--include-sample-dbt-project", is_flag=True, default=False, show_default=True)
@@ -119,6 +139,8 @@ def build_project_group() -> click.Group:
         project_name: str,
         namespace: str,
         dagster_version: str,
+        dbt_dagsterizer_version: str | None,
+        no_pin_dbt_dagsterizer: bool,
         default_env: str,
         code_location_port: str,
         include_sample_dbt_project: bool,
@@ -149,6 +171,21 @@ def build_project_group() -> click.Group:
         if not dagster_version_value:
             raise click.ClickException("--dagster-version must be non-empty")
 
+        if no_pin_dbt_dagsterizer:
+            if dbt_dagsterizer_version is not None:
+                raise click.ClickException(
+                    "--no-pin-dbt-dagsterizer and --dbt-dagsterizer-version are mutually exclusive"
+                )
+            dbt_dagsterizer_version_value = ""
+        elif dbt_dagsterizer_version is None:
+            dbt_dagsterizer_version_value = _default_dbt_dagsterizer_version()
+        else:
+            dbt_dagsterizer_version_value = dbt_dagsterizer_version.strip()
+            if not dbt_dagsterizer_version_value:
+                raise click.ClickException(
+                    "--dbt-dagsterizer-version must be non-empty (use --no-pin-dbt-dagsterizer to leave it unpinned)"
+                )
+
         output_dir = output_dir.expanduser().resolve()
         output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -158,6 +195,7 @@ def build_project_group() -> click.Group:
             "package_name": package_name_value,
             "namespace": namespace_value,
             "dagster_version": dagster_version_value,
+            "dbt_dagsterizer_version": dbt_dagsterizer_version_value,
             "default_env": default_env,
             "code_location_port": str(code_location_port),
             "include_sample_dbt_project": bool(include_sample_dbt_project),

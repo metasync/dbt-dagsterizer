@@ -9,6 +9,12 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 ### Added
 
 - Added a root Makefile with `build` / `publish` targets for packaging and publishing via `uv`.
+- Added `--dbt-dagsterizer-version` to `project init` to optionally pin `dbt-dagsterizer` in rendered projects (defaults to the installed CLI version when available).
+- Added `--no-pin-dbt-dagsterizer` to `project init` to leave `dbt-dagsterizer` unpinned in rendered projects.
+
+### Changed
+
+- Made `--dbt-dagsterizer-version` and `--no-pin-dbt-dagsterizer` mutually exclusive, and require `--dbt-dagsterizer-version` to be non-empty when explicitly provided.
 
 ## [0.2.1] - 2026-05-15
 

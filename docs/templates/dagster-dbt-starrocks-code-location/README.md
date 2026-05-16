@@ -26,6 +26,8 @@ In Luban CI, Dagster code location GitOps templates typically inject OTEL settin
 
 Rendered projects depend on the published `dbt-dagsterizer` Python package and use it to build Dagster `Definitions`.
 
+The rendered `pyproject.toml` pins `dbt-dagsterizer` by default to the installed CLI version (when available) so generated code locations align with the generator. Override with `dbt-dagsterizer project init --dbt-dagsterizer-version ...` or leave it unpinned with `--no-pin-dbt-dagsterizer` (mutually exclusive).
+
 Use the CLI to write orchestration intent into `dbt_project/dagsterization.yml` and refresh the dbt manifest:
 
 ```bash

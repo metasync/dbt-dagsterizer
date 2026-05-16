@@ -74,6 +74,8 @@ dbt-dagsterizer project init \
   --author-email "you@example.com"
 ```
 
+By default, rendered projects pin `dbt-dagsterizer` to the installed CLI version (when available) so the generated code location matches the generator. Override with `--dbt-dagsterizer-version` or leave it unpinned with `--no-pin-dbt-dagsterizer` (mutually exclusive).
+
 To include sample dbt models in the rendered project:
 
 ```bash

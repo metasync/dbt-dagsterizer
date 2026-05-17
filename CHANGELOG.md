@@ -10,6 +10,17 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 
 ### Changed
 
+## [0.2.3] - 2026-05-17
+
+### Added
+
+- Added `project gen-gitops-env` to generate kustomize-style app ConfigMap/Secret YAML from a rendered project’s `.env` file.
+
+### Changed
+
+- `project gen-gitops-env` now normalizes Kubernetes resource names (underscores become hyphens) by default.
+- `project gen-gitops-env` now defaults `--dagster-home` to `/tmp/dagster_home`.
+
 ## [0.2.2] - 2026-05-16
 
 ### Added

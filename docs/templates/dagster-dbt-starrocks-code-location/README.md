@@ -35,6 +35,14 @@ dbt-dagsterizer meta init --parse
 dbt-dagsterizer meta validate --prepare
 ```
 
+To generate GitOps (kustomize-style) `configmap.yaml` / `secret.yaml` files from a mature local `.env`, run:
+
+```bash
+dbt-dagsterizer project gen-gitops-env
+```
+
+Generated ConfigMap/Secret names follow Kubernetes naming (underscores become hyphens).
+
 CLI reference: `../../concepts/cli.md`.
 
 ## Guides

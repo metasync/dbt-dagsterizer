@@ -8,6 +8,8 @@ from pathlib import Path
 
 import click
 
+from ..gitops_env import generate_gitops_env
+
 
 def _default_dagster_version() -> str:
     try:
@@ -217,5 +219,49 @@ def build_project_group() -> click.Group:
 
         project_root = output_dir / app_name
         click.echo(str(project_root))
+
+    @project.command("gen-gitops-env")
+    @click.option("--project-dir", type=click.Path(path_type=Path), default=Path.cwd(), show_default=True)
+    @click.option("--env-file", type=click.Path(path_type=Path), default=Path(".env"), show_default=True)
+    @click.option(
+        "--output-dir",
+        "output_dir_",
+        type=click.Path(path_type=Path),
+        default=Path(".gitops-env"),
+        show_default=True,
+    )
+    @click.option(
+        "--dagster-home",
+        default="/tmp/dagster_home",
+        show_default=True,
+        help="Value to write as DAGSTER_HOME in the generated GitOps ConfigMap (do not reuse the local .env value).",
+    )
+    @click.option("--overwrite/--no-overwrite", default=False, show_default=True)
+    @click.option("--update-gitignore/--no-update-gitignore", default=True, show_default=True)
+    def project_gen_gitops_env(
+        project_dir: Path,
+        env_file: Path,
+        output_dir_: Path,
+        dagster_home: str,
+        overwrite: bool,
+        update_gitignore: bool,
+    ) -> None:
+        try:
+            out = generate_gitops_env(
+                project_dir=project_dir,
+                env_file=env_file,
+                output_dir=output_dir_,
+                dagster_home=dagster_home,
+                overwrite=overwrite,
+                update_gitignore=update_gitignore,
+            )
+        except FileNotFoundError as e:
+            raise click.ClickException(f"Missing file: {e}") from e
+        except FileExistsError as e:
+            raise click.ClickException(f"Output dir already exists: {e} (use --overwrite)") from e
+        except ValueError as e:
+            raise click.ClickException(str(e)) from e
+
+        click.echo(str(out))
 
     return project

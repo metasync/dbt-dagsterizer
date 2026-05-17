@@ -94,6 +94,25 @@ Notes:
 - `--force` overwrites an existing output directory.
 - By default the rendered dbt project is an empty skeleton; use `--include-sample-dbt-project` to include sample models.
 
+### `project gen-gitops-env`
+
+Generates a kustomize-style `app/` directory containing `configmap.yaml` and `secret.yaml` files under:
+
+- `app/base/`
+- `app/overlays/snd/`
+- `app/overlays/prd/`
+
+The command reads values from the rendered project’s `.env` file and writes the generated files into `.gitops-env/` by default (and adds it to `.gitignore`).
+
+```bash
+dbt-dagsterizer project gen-gitops-env
+```
+
+Resource naming:
+
+- The ConfigMap/Secret names are derived from the rendered project’s `pyproject.toml` name, normalized to a Kubernetes-safe form (underscores become hyphens).
+- `--dagster-home` defaults to `/tmp/dagster_home`. Override if your GitOps template mounts a different path.
+
 ### `meta validate`
 
 Validates `dagsterization.yml` against `dbt_project/target/manifest.json`.

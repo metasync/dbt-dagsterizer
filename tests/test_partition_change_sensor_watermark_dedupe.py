@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import dagster as dg
 
@@ -37,7 +37,22 @@ def test_partition_change_sensor_uses_watermark_cursor_and_dedupes(monkeypatch):
         lambda meta, manifest: _Sparse(detect_relation="ods.orders"),
     )
 
-    d = (datetime.now().date() - timedelta(days=1))
+    fixed_now = datetime(2026, 5, 18, 12, 0, 0, tzinfo=timezone.utc)
+
+    class _FixedDatetime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            if tz is None:
+                return fixed_now.replace(tzinfo=None)
+            return fixed_now.astimezone(tz)
+
+        @classmethod
+        def fromisoformat(cls, date_string: str):
+            return datetime.fromisoformat(date_string)
+
+    monkeypatch.setattr(factory, "datetime", _FixedDatetime)
+
+    d = (fixed_now - timedelta(days=1)).date()
     w1 = datetime(d.year, d.month, d.day, 10, 0, 0)
     w2 = datetime(d.year, d.month, d.day, 11, 0, 0)
 

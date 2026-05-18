@@ -45,6 +45,32 @@ def _normalize_app_name(name: str) -> str:
     return name
 
 
+def _normalize_output_name(name: str) -> str:
+    """Normalize a human-friendly name into a folder-safe directory name.
+
+    Rules:
+    - Lowercase.
+    - Replace non-alphanumeric characters with `-`.
+    - Collapse consecutive `-`.
+    - Strip leading/trailing `-`.
+    """
+    name = name.strip().lower()
+    if not name:
+        raise click.ClickException("--output-name must be non-empty")
+    if name in {".", ".."}:
+        raise click.ClickException("--output-name must not be '.' or '..'")
+    if "/" in name or "\\" in name:
+        raise click.ClickException("--output-name must not contain path separators")
+
+    name = re.sub(r"[^0-9a-zA-Z]+", "-", name)
+    name = re.sub(r"-+", "-", name).strip("-")
+    if not name:
+        raise click.ClickException(
+            "--output-name must include at least one ASCII letter/digit after normalization"
+        )
+    return name
+
+
 def _normalize_namespace(namespace: str) -> str:
     ns = namespace.strip().lower()
     if not ns:
@@ -102,6 +128,11 @@ def build_project_group() -> click.Group:
         help="Human-friendly app name (used to derive code-location/package names)",
     )
     @click.option(
+        "--output-name",
+        default=None,
+        help="Output directory name (defaults to a kebab-case name derived from --project-name).",
+    )
+    @click.option(
         "--namespace",
         default="",
         show_default=True,
@@ -139,6 +170,7 @@ def build_project_group() -> click.Group:
         output_dir: Path,
         force: bool,
         project_name: str,
+        output_name: str | None,
         namespace: str,
         dagster_version: str,
         dbt_dagsterizer_version: str | None,
@@ -167,6 +199,7 @@ def build_project_group() -> click.Group:
         package_name_value = app_name
 
         project_name_value = project_name
+        output_name_value = _normalize_output_name(output_name or project_name)
         namespace_value = _normalize_namespace(namespace)
 
         dagster_version_value = dagster_version.strip()
@@ -191,8 +224,15 @@ def build_project_group() -> click.Group:
         output_dir = output_dir.expanduser().resolve()
         output_dir.mkdir(parents=True, exist_ok=True)
 
+        project_root = output_dir / output_name_value
+        if project_root.exists() and not force:
+            raise click.ClickException(
+                f"Output directory already exists: {project_root} (use --force, or choose a different --output-name)"
+            )
+
         extra_context = {
             "project_name": project_name_value,
+            "output_name": output_name_value,
             "app_name": app_name,
             "package_name": package_name_value,
             "namespace": namespace_value,
@@ -217,7 +257,6 @@ def build_project_group() -> click.Group:
                 overwrite_if_exists=force,
             )
 
-        project_root = output_dir / app_name
         click.echo(str(project_root))
 
     @project.command("gen-gitops-env")

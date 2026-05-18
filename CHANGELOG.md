@@ -9,8 +9,11 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 ### Added
 
 - Added documentation describing the Dagster Kubernetes execution model (daemon vs code location vs run pods) and how environment variables propagate.
+- Added `--output-name` to `project init` to control the rendered project folder name.
 
 ### Changed
+
+- `project init` now defaults the output folder name to a kebab-case name derived from `--project-name` (package/module names are still normalized separately).
 
 ## [0.2.3] - 2026-05-17
 

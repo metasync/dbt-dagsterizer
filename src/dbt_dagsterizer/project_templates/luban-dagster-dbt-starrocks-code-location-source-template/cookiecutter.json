@@ -1,6 +1,7 @@
 {
   "namespace": "",
   "project_name": "",
+  "output_name": "",
   "app_name": "",
   "package_name": "",
   "dagster_version": "1.12.19",

@@ -18,7 +18,7 @@ def _template_macros_dir(*, template_name: str) -> importlib.resources.abc.Trave
     if not template_root.is_dir():
         raise click.ClickException(f"Template not found: {template_name}")
     return template_root.joinpath(
-        "{{cookiecutter.app_name}}",
+        "{{cookiecutter.output_name}}",
         "dbt_project",
         "macros",
         "dbt_dagsterizer",

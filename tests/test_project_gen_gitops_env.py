@@ -28,7 +28,7 @@ def test_project_gen_gitops_env_generates_kustomize_tree(tmp_path: Path):
     )
     assert result.exit_code == 0, result.output
 
-    project_root = out_dir / "demo_app"
+    project_root = out_dir / "demo-app"
     env_example = (project_root / ".env.example").read_text(encoding="utf-8")
     env_text = env_example.replace("STARROCKS_PASSWORD=\n", "STARROCKS_PASSWORD=supersecret\n")
     (project_root / ".env").write_text(env_text, encoding="utf-8")

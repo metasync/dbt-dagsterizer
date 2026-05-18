@@ -27,7 +27,7 @@ def test_project_init_renders_into_output_dir(tmp_path: Path):
         ],
     )
     assert result.exit_code == 0, result.output
-    project_root = out_dir / "demo_app"
+    project_root = out_dir / "demo-app"
     assert project_root.exists()
     assert (project_root / "pyproject.toml").exists()
     assert (project_root / "dbt_project" / "dbt_project.yml").exists()
@@ -72,8 +72,52 @@ def test_project_init_namespace_affects_env_defaults(tmp_path: Path):
     )
     assert result.exit_code == 0, result.output
 
-    project_root = out_dir / "demo_app"
+    project_root = out_dir / "demo-app"
     env_example = (project_root / ".env.example").read_text(encoding="utf-8")
     assert "OTEL_SERVICE_NAME=demo_project/demo_app" in env_example
     assert "service.namespace=demo_project" in env_example
     assert "STARROCKS_DWS_DB=demo_project_demo_app_dws_" in env_example
+
+
+def test_project_init_output_name_overrides_folder_name(tmp_path: Path):
+    runner = CliRunner()
+    out_dir = tmp_path / "out"
+
+    result = runner.invoke(
+        cli,
+        [
+            "project",
+            "init",
+            "--output-dir",
+            str(out_dir),
+            "--project-name",
+            "Demo App",
+            "--output-name",
+            "custom-dir",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    project_root = out_dir / "custom-dir"
+    assert project_root.exists()
+    assert (project_root / "pyproject.toml").exists()
+    assert (project_root / "src" / "demo_app").exists()
+
+
+def test_project_init_errors_when_output_dir_exists_without_force(tmp_path: Path):
+    runner = CliRunner()
+    out_dir = tmp_path / "out"
+    (out_dir / "demo-app").mkdir(parents=True, exist_ok=True)
+
+    result = runner.invoke(
+        cli,
+        [
+            "project",
+            "init",
+            "--output-dir",
+            str(out_dir),
+            "--project-name",
+            "Demo App",
+        ],
+    )
+    assert result.exit_code != 0
+    assert "Output directory already exists" in result.output

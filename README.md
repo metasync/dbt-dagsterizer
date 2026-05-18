@@ -31,6 +31,7 @@ Dagster code locations typically import `dbt_dagsterizer` at runtime (for exampl
 - Docs index: [docs/README.md](docs/README.md)
 - Getting started: [docs/getting-started.md](docs/getting-started.md)
 - CLI reference: [docs/concepts/cli.md](docs/concepts/cli.md)
+- Execution model and env propagation: [docs/concepts/execution-model.md](docs/concepts/execution-model.md)
 - Template docs (Dagster + dbt + StarRocks): [docs/templates/.../README.md](docs/templates/dagster-dbt-starrocks-code-location/README.md)
 
 ## Quick start

@@ -7,6 +7,7 @@ This directory contains developer-facing documentation for `dbt-dagsterizer`.
 - Getting started: [getting-started.md](getting-started.md)
 - Concepts overview: [concepts/overview.md](concepts/overview.md)
 - CLI reference: [concepts/cli.md](concepts/cli.md)
+- Execution model and env propagation: [concepts/execution-model.md](concepts/execution-model.md)
 
 ## Template docs (Dagster + dbt + StarRocks code location)
 

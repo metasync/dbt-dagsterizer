@@ -58,11 +58,22 @@ class LubanDagsterDbtTranslator(DagsterDbtTranslator):
         return base_key.with_prefix("dbt")
 
     def get_group_name(self, dbt_resource_props: Mapping[str, Any]) -> Optional[str]:
-        fqn = dbt_resource_props.get("fqn", [])
-        if "dwd" in fqn:
-            return "dwd"
-        if "dws" in fqn:
-            return "dws"
+        resource_type = dbt_resource_props.get("resource_type")
+        if resource_type != "model":
+            return None
+
+        original_file_path = (dbt_resource_props.get("original_file_path") or "").replace("\\", "/").lstrip("./")
+        if original_file_path:
+            parts = [p for p in original_file_path.split("/") if p]
+            if "models" in parts:
+                models_idx = parts.index("models")
+                if len(parts) > models_idx + 2:
+                    return parts[models_idx + 1]
+                return None
+
+        fqn = dbt_resource_props.get("fqn") or []
+        if len(fqn) >= 3:
+            return str(fqn[1])
         return None
 
     def get_partitions_def(self, dbt_resource_props: Mapping[str, Any]) -> Optional[dg.PartitionsDefinition]:

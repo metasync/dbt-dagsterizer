@@ -48,14 +48,43 @@ class LubanDagsterDbtTranslator(DagsterDbtTranslator):
     def _propagator_mode_is_eager(self) -> bool:
         return self.propagator_mode == "eager"
 
-    def get_asset_key(self, dbt_resource_props: Mapping[str, Any]) -> dg.AssetKey:
-        resource_type = dbt_resource_props.get("resource_type")
-        if resource_type == "source":
-            base_key = dg.AssetKey([dbt_resource_props["source_name"], dbt_resource_props["name"]])
-        else:
-            base_key = dg.AssetKey([dbt_resource_props["name"]])
+    def _clean_asset_key_segment(self, value: Any) -> str:
+        s = str(value or "").strip()
+        if not s:
+            return ""
+        if (s.startswith('"') and s.endswith('"')) or (s.startswith("'") and s.endswith("'")):
+            s = s[1:-1].strip()
+        if s.startswith("`") and s.endswith("`"):
+            s = s[1:-1].strip()
+        return s.replace("/", "_").replace("\\", "_")
 
-        return base_key.with_prefix("dbt")
+    def _relation_asset_key(self, dbt_resource_props: Mapping[str, Any]) -> dg.AssetKey:
+        resource_type = dbt_resource_props.get("resource_type")
+
+        database = self._clean_asset_key_segment(dbt_resource_props.get("database"))
+        schema = self._clean_asset_key_segment(dbt_resource_props.get("schema"))
+
+        identifier = ""
+        if resource_type == "source":
+            identifier = self._clean_asset_key_segment(
+                dbt_resource_props.get("identifier") or dbt_resource_props.get("name")
+            )
+        else:
+            identifier = self._clean_asset_key_segment(
+                dbt_resource_props.get("alias")
+                or dbt_resource_props.get("identifier")
+                or dbt_resource_props.get("name")
+            )
+
+        segments = ["dbt"]
+        for seg in (database, schema, identifier):
+            if seg:
+                segments.append(seg)
+
+        return dg.AssetKey(segments)
+
+    def get_asset_key(self, dbt_resource_props: Mapping[str, Any]) -> dg.AssetKey:
+        return self._relation_asset_key(dbt_resource_props)
 
     def get_group_name(self, dbt_resource_props: Mapping[str, Any]) -> Optional[str]:
         resource_type = dbt_resource_props.get("resource_type")

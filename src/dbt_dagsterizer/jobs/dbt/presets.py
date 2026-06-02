@@ -2,6 +2,7 @@ def models_job(
     *,
     name: str,
     models: list[str],
+    keys: list[list[str]] | None = None,
     key_prefix: str = "dbt",
     include_upstream: bool = False,
     partitions: str | None = None,
@@ -11,7 +12,8 @@ def models_job(
     if not models:
         raise ValueError("Models list must be non-empty")
 
-    keys = [[key_prefix, model] for model in models]
+    if keys is None:
+        keys = [[key_prefix, model] for model in models]
     return {
         "name": name,
         "selection": {
@@ -47,4 +49,3 @@ def dbt_cli_build_job(
         "vars": vars or {},
         "partitions": partitions,
     }
-

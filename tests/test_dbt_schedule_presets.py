@@ -8,3 +8,10 @@ def test_daily_at_defaults_to_yesterday_partition():
     assert spec["partition_type"] == "daily"
     assert spec["partition_offset_days"] == 1
 
+
+def test_daily_at_can_run_today_partition():
+    from dbt_dagsterizer.schedules.dbt.presets import daily_at
+
+    spec = daily_at(name="my_daily", job_name="my_job", hour=0, minute=0, offset_days=0)
+    assert spec["partition_type"] == "daily"
+    assert spec["partition_offset_days"] == 0

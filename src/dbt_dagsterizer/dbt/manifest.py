@@ -16,6 +16,9 @@ class DbtModel:
     fqn: list[str]
     tags: set[str]
     meta: dict[str, Any]
+    database: str
+    schema: str
+    identifier: str
 
 
 def _manifest_path() -> Path:
@@ -53,6 +56,9 @@ def iter_models(manifest: dict[str, Any]) -> list[DbtModel]:
                 fqn=list(props.get("fqn") or []),
                 tags=set(props.get("tags") or []),
                 meta=dict(props.get("meta") or {}),
+                database=str(props.get("database") or ""),
+                schema=str(props.get("schema") or ""),
+                identifier=str(props.get("identifier") or name),
             )
         )
     return result

@@ -16,6 +16,7 @@ def build_partition_propagation_sensors(*, specs: list[dict], jobs_by_name: dict
     def _make_sensor(spec: dict) -> dg.SensorDefinition:
         name = spec["name"]
         upstream_dbt_model = spec["upstream_dbt_model"]
+        upstream_model_relation = spec.get("upstream_model_relation")
         job_name = spec["job_name"]
 
         enabled = bool(spec.get("enabled", False))
@@ -23,7 +24,10 @@ def build_partition_propagation_sensors(*, specs: list[dict], jobs_by_name: dict
         minimum_interval_seconds = int(spec.get("minimum_interval_seconds", 30))
 
         job = jobs_by_name[job_name]
-        upstream_asset_key = dg.AssetKey(["dbt", upstream_dbt_model])
+        if upstream_model_relation:
+            upstream_asset_key = dg.AssetKey(upstream_model_relation)
+        else:
+            upstream_asset_key = dg.AssetKey(["dbt", upstream_dbt_model])
 
         catchup_days_raw = os.getenv("LUBAN_PARTITION_CHANGE_PROPAGATOR_CATCHUP_DAYS", "0")
         try:

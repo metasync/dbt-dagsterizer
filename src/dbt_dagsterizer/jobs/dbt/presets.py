@@ -2,6 +2,7 @@ def models_job(
     *,
     name: str,
     models: list[str],
+    model_relations: dict[str, list[str]] | None = None,
     key_prefix: str = "dbt",
     include_upstream: bool = False,
     partitions: str | None = None,
@@ -11,7 +12,10 @@ def models_job(
     if not models:
         raise ValueError("Models list must be non-empty")
 
-    keys = [[key_prefix, model] for model in models]
+    if model_relations:
+        keys = [model_relations[model] for model in models if model in model_relations]
+    else:
+        keys = [[key_prefix, model] for model in models]
     return {
         "name": name,
         "selection": {

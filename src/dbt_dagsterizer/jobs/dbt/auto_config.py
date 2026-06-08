@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from ...assets.dbt.translator import relation_asset_key_path
 from ...dbt.manifest import iter_models, load_manifest
 from ...orchestration_config import (
     default_orchestration_path,
@@ -20,7 +21,9 @@ from .presets import models_job
 
 def build_auto_dbt_job_specs() -> list[dict]:
     manifest = load_manifest()
-    existing_models = {m.name for m in iter_models(manifest)}
+    models = iter_models(manifest)
+    existing_models = {m.name for m in models}
+    model_relations = {m.name: relation_asset_key_path(database=m.database, schema=m.schema, identifier=m.identifier) for m in models}
 
     dbt_project_dir = get_dbt_project_dir()
     cfg_path = resolve_orchestration_path(
@@ -61,6 +64,7 @@ def build_auto_dbt_job_specs() -> list[dict]:
                 models_job(
                     name=str(job_name),
                     models=models_list,
+                    model_relations=model_relations,
                     include_upstream=include_upstream,
                     partitions=partitions_value,
                 )
@@ -74,6 +78,7 @@ def build_auto_dbt_job_specs() -> list[dict]:
             models_job(
                 name=str(derive_job_name_for_model(idx, model=model)),
                 models=[model],
+                model_relations=model_relations,
                 include_upstream=False,
                 partitions=partitions_value,
             )

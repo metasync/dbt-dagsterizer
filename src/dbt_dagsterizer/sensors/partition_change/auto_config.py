@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections import defaultdict
 from pathlib import Path
 
+from ...assets.dbt.translator import relation_asset_key_path
 from ...dbt.manifest import iter_models, load_manifest
 from ...orchestration_config import (
     default_orchestration_path,
@@ -18,6 +19,12 @@ from ...orchestration_config import (
 from ...resources.dbt import get_dbt_project_dir
 from .detector.presets import daily_partition_change
 from .propagator.presets import partition_change_propagation
+
+
+def _build_model_relation_index(manifest: dict) -> dict[str, list[str]]:
+    """Map dbt model names to their relation-based AssetKey path components."""
+    models = iter_models(manifest)
+    return {m.name: relation_asset_key_path(database=m.database, schema=m.schema, identifier=m.identifier) for m in models}
 
 
 def build_auto_partition_change_detection_specs() -> list[dict]:
@@ -93,6 +100,7 @@ def build_auto_partition_change_detection_specs() -> list[dict]:
 def build_auto_partition_change_propagation_specs() -> list[dict]:
     manifest = load_manifest()
     existing_models = {m.name for m in iter_models(manifest)}
+    model_relations = _build_model_relation_index(manifest)
     dbt_project_dir = get_dbt_project_dir()
     cfg_path = resolve_orchestration_path(
         dbt_project_dir=dbt_project_dir,
@@ -133,9 +141,14 @@ def build_auto_partition_change_propagation_specs() -> list[dict]:
 
                 spec_name = name or f"{upstream_model}_partition_change_to_{job_name}"
 
+                upstream_model_relation = model_relations.get(upstream_model)
+                if upstream_model_relation is None:
+                    raise ValueError(f"Partition-change propagation references missing dbt model '{upstream_model}'")
+
                 spec = partition_change_propagation(
                     name=str(spec_name),
                     upstream_dbt_model=upstream_model,
+                    upstream_model_relation=upstream_model_relation,
                     job_name=str(job_name),
                     enabled=enabled,
                     minimum_interval_seconds=minimum_interval_seconds,

@@ -2,6 +2,7 @@ def partition_change_propagation(
     *,
     name: str,
     upstream_dbt_model: str,
+    upstream_model_relation: list[str] | None = None,
     job_name: str,
     enabled: bool = False,
     minimum_interval_seconds: int = 30,
@@ -18,6 +19,7 @@ def partition_change_propagation(
     return {
         "name": name,
         "upstream_dbt_model": upstream_dbt_model,
+        "upstream_model_relation": upstream_model_relation,
         "job_name": job_name,
         "enabled": enabled,
         "minimum_interval_seconds": minimum_interval_seconds,

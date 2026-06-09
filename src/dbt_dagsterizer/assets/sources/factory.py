@@ -47,6 +47,7 @@ def build_observable_source_assets(
         source_name = spec["source"]
         table_name = spec["table"]
         watermark_column = spec["watermark_column"]
+        watermark_sql = spec["watermark_sql"]
 
         db_env_var = source_db_env_var_map.get(source_name, f"STARROCKS_{source_name.upper()}_DB")
         db_default = source_db_default_map.get(source_name)
@@ -64,8 +65,9 @@ def build_observable_source_assets(
         def _observable(context) -> dg.DataVersion:
             db_name = os.getenv(db_env_var, db_default)
             value = context.resources.starrocks.query_scalar(
-                f"select max({_quoted_identifier(watermark_column)}) from {_quoted_identifier(db_name)}.{_quoted_identifier(table_name)}"
+                f"{watermark_sql}" if not watermark_sql is None else f"select max({_quoted_identifier(watermark_column)}) from {_quoted_identifier(db_name)}.{_quoted_identifier(table_name)}"
             )
+           
             return dg.DataVersion(str(value) if value is not None else "")
 
         return _observable

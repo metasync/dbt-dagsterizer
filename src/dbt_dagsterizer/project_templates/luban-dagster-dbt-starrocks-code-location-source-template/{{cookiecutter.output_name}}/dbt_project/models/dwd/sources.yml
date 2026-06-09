@@ -9,6 +9,7 @@ sources:
           luban:
             observe:
               watermark_column: ods_updated_at
+              # watermark_sql: "select max(customer_id) from metasync_orders_analytics_ods_dev.customers"
         columns:
           - name: customer_id
             tests:

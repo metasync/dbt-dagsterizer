@@ -90,11 +90,12 @@ class LubanDagsterDbtTranslator(DagsterDbtTranslator):
                 models_idx = parts.index("models")
                 if len(parts) > models_idx + 2:
                     return parts[models_idx + 1]
-                return None
                 
         fqn = dbt_resource_props.get("fqn") or []
         if len(fqn) >= 3:
             return str(fqn[1])
+        elif len(fqn) == 2:
+            return str(fqn[0])
         return None
 
     def get_partitions_def(self, dbt_resource_props: Mapping[str, Any]) -> Optional[dg.PartitionsDefinition]:

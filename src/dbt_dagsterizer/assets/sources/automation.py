@@ -12,7 +12,7 @@ def _manifest_path() -> Path:
     return get_dbt_project_dir() / "target" / "manifest.json"
 
 
-def load_automation_observable_sources() -> list[dict[str, str]]:
+def load_automation_observable_sources() -> list[dict[str, str | None]]:
     prepare_manifest_if_missing()
     with _manifest_path().open("r", encoding="utf-8") as f:
         manifest = json.load(f)
@@ -26,7 +26,8 @@ def load_automation_observable_sources() -> list[dict[str, str]]:
         luban_meta: dict[str, Any] = meta.get("luban") or {}
         observe: dict[str, Any] = luban_meta.get("observe") or {}
         watermark_column = observe.get("watermark_column")
-        if not watermark_column:
+        watermark_sql = observe.get("watermark_sql")
+        if not watermark_column and not watermark_sql:
             continue
         source_name = props.get("source_name")
         table_name = props.get("name")
@@ -37,9 +38,9 @@ def load_automation_observable_sources() -> list[dict[str, str]]:
             {
                 "source": str(source_name),
                 "table": str(table_name),
-                "watermark_column": str(watermark_column),
+                "watermark_column": str(watermark_column) if watermark_column is not None else None,
+                "watermark_sql": str(watermark_sql) if watermark_sql is not None else None,
             }
         )
 
     return sorted(specs, key=lambda s: (s["source"], s["table"]))
-

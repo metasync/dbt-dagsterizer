@@ -46,7 +46,14 @@ def build_observable_source_assets(
     def make_asset(spec: dict):
         source_name = spec["source"]
         table_name = spec["table"]
-        watermark_column = spec["watermark_column"]
+        watermark_column = spec.get("watermark_column")
+        watermark_sql = spec.get("watermark_sql")
+
+        if not watermark_column and not watermark_sql:
+            raise ValueError(
+                f"Observable source spec for {source_name}.{table_name} requires "
+                "either watermark_column or watermark_sql."
+            )
 
         db_env_var = source_db_env_var_map.get(source_name, f"STARROCKS_{source_name.upper()}_DB")
         db_default = source_db_default_map.get(source_name)
@@ -64,11 +71,15 @@ def build_observable_source_assets(
         def _observable(context) -> dg.DataVersion:
             db_name = os.getenv(db_env_var, db_default)
             value = context.resources.starrocks.query_scalar(
-                f"select max({_quoted_identifier(watermark_column)}) from {_quoted_identifier(db_name)}.{_quoted_identifier(table_name)}"
+                str(watermark_sql)
+                if watermark_sql
+                else (
+                    f"select max({_quoted_identifier(str(watermark_column))}) "
+                    f"from {_quoted_identifier(db_name)}.{_quoted_identifier(table_name)}"
+                )
             )
             return dg.DataVersion(str(value) if value is not None else "")
 
         return _observable
 
     return [make_asset(spec) for spec in source_specs]
-

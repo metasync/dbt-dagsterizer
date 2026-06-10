@@ -46,6 +46,20 @@ def _set_env_var(lines: list[str], key: str, value: str) -> list[str]:
     return lines + [replacement]
 
 
+def _set_dbt_project_var_bool(*, path: Path, key: str, value: bool) -> None:
+    if not path.exists():
+        return
+
+    needle = f"  {key}:"
+    replacement = f"{needle} {'true' if value else 'false'}\n"
+    lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
+    for i, line in enumerate(lines):
+        if line.startswith(needle):
+            lines[i] = replacement
+            path.write_text("".join(lines), encoding="utf-8")
+            return
+
+
 def main() -> None:
     default_env = "{{ cookiecutter.default_env }}".strip()
     include_sample = (
@@ -94,6 +108,13 @@ def main() -> None:
                 "seeds",
             ]:
                 (dbt_project_dir / rel).mkdir(parents=True, exist_ok=True)
+
+    if include_sample:
+        _set_dbt_project_var_bool(
+            path=Path("dbt_project") / "dbt_project.yml",
+            key="enable_ods_test",
+            value=True,
+        )
 
     profiles_path = Path("dbt_project") / "profiles.yml"
     if not profiles_path.exists():

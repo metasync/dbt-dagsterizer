@@ -6,11 +6,33 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-06-10
+
+### Breaking
+
+- BREAKING: dbt AssetKeys now use relation-based keys instead of logical names: `dbt/<database>/<schema>/<identifier>`.
+- For adapters that omit the `database` field (common for StarRocks), empty components are omitted and `schema` is treated as the database, so keys may look like `dbt/<database>/<identifier>`.
+- Migration: update any asset selections/configs that reference old model-name keys. Legacy manual `DBT_JOB_SPECS` and `PARTITION_CHANGE_PROPAGATION_SPECS` are upgraded at runtime when the model exists in the manifest, but relation-based keys are the recommended steady state.
+
 ### Added
 
 - Added a dedicated observability guide (OpenTelemetry + Elastic APM) and linked it from relevant docs.
+- Added `offset_days` support for `daily_at` schedules across orchestration config, CLI metadata commands, validation, and schedule preset tests.
+- Added relation metadata (`database`, `schema`, `identifier`) to parsed dbt manifest model records for downstream job and sensor generation.
+- Added documentation for relation-based dbt AssetKeys, folder-derived Dagster group names, `offset_days`, and manual-spec compatibility guidance.
 
 ### Changed
+
+- Changed auto-generated dbt job specs and partition-change propagation specs to use relation-based AssetKeys consistently.
+- Changed dbt model group naming in Dagster to derive the group from the first folder under `models/`, with fallback to non-model resource type or dbt FQN when needed.
+- Changed the sample ODS test models to use StarRocks `PRIMARY` tables with explicit primary keys.
+
+### Fixed
+
+- Fixed partition-change propagators to query upstream materialization events using the same relation-based AssetKeys emitted by dbt assets.
+- Fixed compatibility for manual/custom `DBT_JOB_SPECS` so legacy `["dbt", "<model>"]` asset-key selections are upgraded to relation-based keys at runtime.
+- Fixed compatibility for manual `PARTITION_CHANGE_PROPAGATION_SPECS` so legacy model-name-only configs are upgraded to relation-based upstream asset keys at runtime.
+- Fixed rendered sample projects to enable `ods_test` models by default so they appear in Dagster assets and lineage without extra dbt parse flags.
 
 ## [0.2.4] - 2026-05-20
 

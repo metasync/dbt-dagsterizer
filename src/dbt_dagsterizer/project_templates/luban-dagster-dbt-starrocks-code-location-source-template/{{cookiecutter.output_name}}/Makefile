@@ -9,6 +9,7 @@ export
 
 DBT_PROJECT_DIR ?= ./dbt_project
 DBT_PROFILES_DIR ?= ./dbt_project
+DAGSTER_HOME ?= $(CURDIR)/dagster_home
 DBT_VARS ?=
 ODS_TEST_BOOTSTRAP_VARS ?= {"enable_ods_test": true}
 ODS_TEST_APPEND_VARS ?= {"enable_ods_test": true, "ods_test_orders_append_count": 1000}

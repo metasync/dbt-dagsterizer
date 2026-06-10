@@ -103,6 +103,42 @@ Defaults:
 - `include_upstream`: `false`
 - `partitions`: can be set per job (`daily|unpartitioned`)
 
+### Asset identity for generated jobs
+
+Auto-generated dbt asset jobs now select assets by relation-based AssetKeys instead of logical model names.
+
+- AssetKey format: `dbt/<database>/<schema>/<identifier>` (empty components are omitted)
+- Goal: keep asset identity aligned with the physical dbt relation
+- Benefit: different code locations can refer to the same physical relation without drifting on asset identity
+
+Example:
+
+- dbt model `orders`
+- relation metadata: `database=warehouse`, `schema=dwd`, `identifier=orders`
+- generated Dagster AssetKey: `dbt/warehouse/dwd/orders`
+
+For auto-generated jobs, you do not need to do anything: `dbt-dagsterizer` derives these keys from the manifest automatically.
+
+If you define manual/custom Python `DBT_JOB_SPECS`, prefer relation-based keys. Legacy `["dbt", "<model>"]` selections are still upgraded at runtime for compatibility when the model exists in the manifest.
+
+Manual Python specs are an escape hatch and are intentionally discouraged. They can be brittle across upgrades because the spec shape must remain backward compatible as features evolve. Prefer `dagsterization.yml` and the CLI for jobs/schedules/partition-change configuration whenever possible.
+
+## Dagster asset grouping
+
+Dagster group names are derived from dbt project layout and resource type:
+
+- For dbt models, the group name is the first folder under `models/`
+- For non-model dbt resources, the group falls back to the dbt resource type
+- If folder derivation is not available, dbt FQN is used as a fallback
+
+Examples:
+
+- `models/dwd/orders.sql` -> group `dwd`
+- `models/dws/fact_orders_daily.sql` -> group `dws`
+- `sources.yml` source assets -> group `source`
+
+This makes the Dagster UI reflect the dbt project structure more naturally without additional Python configuration.
+
 ## Creating schedules
 
 Schedules are declared on the model that represents the job’s anchor.
@@ -117,6 +153,7 @@ schedules:
     hour: 1
     minute: 0
     lookback_days: 0
+    offset_days: 1
     enabled: true
 ```
 
@@ -129,8 +166,20 @@ dbt-dagsterizer meta schedule \
   --hour 1 \
   --minute 0 \
   --lookback-days 0 \
+  --offset-days 1 \
   --enabled
 ```
+
+Defaults:
+
+- `offset_days`: `1` (run yesterday’s partition)
+- `lookback_days`: `0`
+
+Notes:
+
+- Use `offset_days: 1` for the common “process yesterday” daily pattern.
+- Use `offset_days: 0` when the schedule should target today’s partition.
+- `offset_days` is part of `dagsterization.yml`, validated by the CLI, and preserved by auto-generated schedule specs.
 
 ## Partition-change sensors (late arrivals)
 
@@ -243,6 +292,8 @@ Notes:
 - The template enables propagation by default on the `orders` model; set `enabled: false` if you want to onboard gradually.
 - `LUBAN_PARTITION_CHANGE_PROPAGATOR_MODE=eager` disables propagation sensors entirely.
 - Propagation sensors only react to new upstream materializations by default. To replay recent upstream partitions after enabling a sensor, set `LUBAN_PARTITION_CHANGE_PROPAGATOR_CATCHUP_DAYS` (for example `7`) before the first time the sensor runs (or after resetting its cursor).
+- Auto-generated propagation specs use the same relation-based AssetKeys as dbt assets, so upstream event lookup remains aligned after the relation-key migration.
+- If you define manual Python `PARTITION_CHANGE_PROPAGATION_SPECS`, prefer `upstream_model_relation=["dbt", "<database>", "<schema>", "<identifier>"]`. Legacy model-name-only specs are upgraded at runtime for compatibility when the model can be resolved from the manifest.
 
 ## Source observation (DataVersion)
 
@@ -266,6 +317,13 @@ This drives observable source assets and the observation job/schedule.
 Rendered projects depend on the `dbt-dagsterizer` Python package. The recommended customization path is via `dagsterization.yml`.
 
 If you need a custom escape hatch, the intended long-term approach is to expose explicit override hooks in `dbt_dagsterizer`. Until then, treat library forks as temporary.
+
+Manual Python specs are an escape hatch and are intentionally discouraged. Prefer `dagsterization.yml` and the CLI first. If you must define manual specs, follow this guidance to reduce upgrade risk:
+
+- Prefer `dagsterization.yml` and the CLI for jobs, schedules, partitions, and partition-change config.
+- If you must define manual `DBT_JOB_SPECS`, use relation-based AssetKeys.
+- If you must define manual `PARTITION_CHANGE_PROPAGATION_SPECS`, include `upstream_model_relation` explicitly.
+- Runtime compatibility shims exist for legacy model-name-only specs, but relation-based definitions are the recommended steady state.
 
 ## Troubleshooting
 

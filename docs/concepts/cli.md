@@ -176,11 +176,13 @@ dbt-dagsterizer meta schedule \
   --hour 2 \
   --minute 0 \
   --lookback-days 3 \
+  --offset-days 1 \
   --enabled
 ```
 
 Flags:
 
+- `--offset-days`: partition offset for `daily_at` schedules (`1` = yesterday, `0` = today)
 - `--parse`: run `dbt parse` after writing
 
 ### `meta partition`
@@ -270,6 +272,13 @@ dbt-dagsterizer meta partition-change propagator \
   --targets daily_facts_job
 ```
 
+Notes:
+
+- Auto-generated propagation specs use relation-based AssetKeys derived from the dbt manifest.
+- Manual Python propagation specs should prefer `upstream_model_relation` when constructing specs directly.
+- For backward compatibility, legacy manual specs that only provide `upstream_dbt_model` are upgraded to relation-based upstream keys at runtime when the model exists in the manifest.
+- Manual Python specs are an escape hatch and are intentionally discouraged because they can be brittle across upgrades. Prefer defining propagators in `dagsterization.yml` using this CLI.
+
 ### `macros sync`
 
 Syncs namespaced macro templates shipped with `dbt-dagsterizer` into a dbt project at `macros/dbt_dagsterizer/`.
@@ -291,3 +300,10 @@ Template selection:
 ## Why `--parse` exists
 
 Dagster reads orchestration intent from the dbt manifest. If you update YAML but do not rebuild `target/manifest.json`, Dagster will not see the change. `--parse` updates the manifest immediately.
+
+## Asset identity and grouping notes
+
+- Auto-generated dbt asset jobs now select assets by relation-based AssetKeys: `dbt/<database>/<schema>/<identifier>` (empty components are omitted).
+- This keeps job selection stable across code locations that point at the same physical relation.
+- Dagster group names for dbt models are derived from the first folder under `models/`.
+- Manual/custom Python specs are an escape hatch and are intentionally discouraged because they can be tricky to keep backward compatible as features evolve. If you must use them, legacy model-name-only job/propagation definitions are upgraded to relation-based keys at runtime when possible.

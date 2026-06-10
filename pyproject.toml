@@ -1,6 +1,6 @@
 [project]
 name = "dbt-dagsterizer"
-version = "0.2.4"
+version = "0.3.0"
 description = "Dagster automation driven by dbt metadata (Luban CI)"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -14,7 +14,25 @@ dependencies = [
     "pymysql>=1.1.0",
     "ruamel-yaml>=0.19.1",
 ]
+flowchart LR
+    A[dbt manifest props] --> B[relation_asset_key_path]
+    B -->|omit empty parts<br/>schema->database when db empty| C[Normalized AssetKey]
+    C --> D[Dagster Catalog/Lineage]
 
+    E[manual DBT_JOB_SPECS<br/>legacy ['dbt', model]] --> F[_normalize_manual_job_specs]
+    F --> C
+
+    G[manual propagation specs] --> H[_normalize_manual_propagation_specs]
+    H --> C
+
+    I[cookiecutter include_sample_dbt_project=true] --> J[post_gen_project flips enable_ods_test=true]
+    J --> K[dbt parse includes ods_test nodes]
+    K --> D
+
+    style B fill:#bbdefb,color:#0d47a1
+    style F fill:#c8e6c9,color:#1a5e20
+    style H fill:#c8e6c9,color:#1a5e20
+    style J fill:#fff3e0,color:#e65100
 [tool.hatch.build.targets.wheel]
 packages = ["src/dbt_dagsterizer"]
 

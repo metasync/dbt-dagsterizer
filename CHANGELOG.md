@@ -6,6 +6,8 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-06-10
+
 ### Added
 
 - Added optional `watermark_sql` support for observable source assets as an alternative to `watermark_column`.

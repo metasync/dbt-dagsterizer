@@ -1,0 +1,4 @@
+- CLI installation: `uv tool install dbt-dagsterizer`.
+- Project scaffolding: `dbt-dagsterizer project init --project-name <name>`.
+- Orchestration bootstrap: `dbt-dagsterizer meta init --parse` followed by `dbt-dagsterizer meta validate --prepare`.
+- Development: `uv sync --dev` and `uv run pytest`.

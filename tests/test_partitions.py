@@ -37,8 +37,7 @@ def test_job_factory_daily_partitions_requires_env_var(monkeypatch):
 
 
 def test_translator_can_lazy_load_daily_partitions_def(monkeypatch):
-    from dagster import DailyPartitionsDefinition
-
+    """Test that translator returns None (partitioning handled at job level)."""
     from dbt_dagsterizer.assets.dbt.translator import LubanDagsterDbtTranslator
 
     monkeypatch.setenv("DAGSTER_DAILY_PARTITIONS_START_DATE", "2024-01-01")
@@ -49,6 +48,7 @@ def test_translator_can_lazy_load_daily_partitions_def(monkeypatch):
         partitions_by_model={"orders": "daily"},
     )
 
+    # IMPORTANT: Translator returns None to preserve lineage across partition types
+    # Partitioning is handled at the job/schedule level
     partitions_def = t.get_partitions_def({"name": "orders"})
-    assert isinstance(partitions_def, DailyPartitionsDefinition)
-    assert t.daily_partitions_def is partitions_def
+    assert partitions_def is None

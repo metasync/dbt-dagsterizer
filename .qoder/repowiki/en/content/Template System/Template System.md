@@ -22,7 +22,16 @@
 - [local_development.md](file://docs/templates/dagster-dbt-starrocks-code-location/local_development.md)
 - [developer_workflow.md](file://docs/templates/dagster-dbt-starrocks-code-location/developer_workflow.md)
 - [README.md](file://docs/templates/dagster-dbt-starrocks-code-location/README.md)
+- [local-development.md](file://docs/development/local-development.md)
 </cite>
+
+## Update Summary
+**Changes Made**
+- Added documentation for the new `refresh-dagsterizer` Makefile target
+- Enhanced local development workflow documentation with improved dependency handling
+- Updated conditional dependency management section
+- Added comprehensive troubleshooting guide for the new refresh workflow
+- Expanded fast iteration loop documentation with practical examples
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -44,6 +53,7 @@ This document explains the template system used by dbt-dagsterizer to scaffold p
 - Environment setup patterns, Docker configuration, and optional sample dbt project inclusion
 - Conditional generation logic and customization options
 - Best practices for maintaining and evolving templates and versions
+- **New**: Enhanced local development workflow with refresh-dagsterizer target for fast iteration
 
 ## Project Structure
 The template system is embedded inside the package under a dedicated templates directory. The CLI discovers and renders the template into a user-specified output directory.
@@ -77,7 +87,7 @@ T_JSON --> R_DAG
 
 **Diagram sources**
 - [project.py:106-261](file://src/dbt_dagsterizer/cli_parts/project.py#L106-L261)
-- [cookiecutter.json:1-28](file://src/dbt_dagsterizer/project_templates/luban-dagster-dbt-starrocks-code-location-source-template/cookiecutter.json#L1-L28)
+- [cookiecutter.json:1-29](file://src/dbt_dagsterizer/project_templates/luban-dagster-dbt-starrocks-code-location-source-template/cookiecutter.json#L1-L29)
 
 **Section sources**
 - [project.py:87-104](file://src/dbt_dagsterizer/cli_parts/project.py#L87-L104)
@@ -88,15 +98,16 @@ T_JSON --> R_DAG
 - Hooks: Pre-generation validates environment selection; post-generation adjusts configuration and removes optional directories.
 - Configuration templates: dbt project settings, Dagster code location entrypoint, StarRocks profile, Docker Compose, and Python packaging.
 - Conditional generation: Sample dbt project and Docker Compose are included or removed based on flags.
+- **New**: Enhanced Makefile targets for local development including refresh-dagsterizer for fast iteration workflow.
 
 **Section sources**
-- [cookiecutter.json:1-28](file://src/dbt_dagsterizer/project_templates/luban-dagster-dbt-starrocks-code-location-source-template/cookiecutter.json#L1-L28)
+- [cookiecutter.json:1-29](file://src/dbt_dagsterizer/project_templates/luban-dagster-dbt-starrocks-code-location-source-template/cookiecutter.json#L1-L29)
 - [pre_gen_project.py:1-17](file://src/dbt_dagsterizer/project_templates/luban-dagster-dbt-starrocks-code-location-source-template/hooks/pre_gen_project.py#L1-L17)
-- [post_gen_project.py:63-132](file://src/dbt_dagsterizer/project_templates/luban-dagster-dbt-starrocks-code-location-source-template/hooks/post_gen_project.py#L63-L132)
+- [post_gen_project.py:63-136](file://src/dbt_dagsterizer/project_templates/luban-dagster-dbt-starrocks-code-location-source-template/hooks/post_gen_project.py#L63-L136)
 - [dbt_project.yml:1-35](file://src/dbt_dagsterizer/project_templates/luban-dagster-dbt-starrocks-code-location-source-template/{{cookiecutter.output_name}}/dbt_project/dbt_project.yml#L1-L35)
 - [profiles.yml:1-48](file://src/dbt_dagsterizer/project_templates/luban-dagster-dbt-starrocks-code-location-source-template/{{cookiecutter.output_name}}/dbt_project/profiles.yml#L1-L48)
 - [pyproject.toml.in:1-51](file://src/dbt_dagsterizer/project_templates/luban-dagster-dbt-starrocks-code-location-source-template/{{cookiecutter.output_name}}/pyproject.toml.in#L1-L51)
-- [Makefile:1-128](file://src/dbt_dagsterizer/project_templates/luban-dagster-dbt-starrocks-code-location-source-template/{{cookiecutter.output_name}}/Makefile#L1-L128)
+- [Makefile:1-134](file://src/dbt_dagsterizer/project_templates/luban-dagster-dbt-starrocks-code-location-source-template/{{cookiecutter.output_name}}/Makefile#L1-L134)
 
 ## Architecture Overview
 The template system integrates CLI-driven rendering with Cookiecutter and post-render customization hooks.
@@ -122,12 +133,12 @@ Hooks-->>U : "Project ready"
 **Diagram sources**
 - [project.py:168-258](file://src/dbt_dagsterizer/cli_parts/project.py#L168-L258)
 - [pre_gen_project.py:1-17](file://src/dbt_dagsterizer/project_templates/luban-dagster-dbt-starrocks-code-location-source-template/hooks/pre_gen_project.py#L1-L17)
-- [post_gen_project.py:63-132](file://src/dbt_dagsterizer/project_templates/luban-dagster-dbt-starrocks-code-location-source-template/hooks/post_gen_project.py#L63-L132)
+- [post_gen_project.py:63-136](file://src/dbt_dagsterizer/project_templates/luban-dagster-dbt-starrocks-code-location-source-template/hooks/post_gen_project.py#L63-L136)
 
 ## Detailed Component Analysis
 
 ### Variable Substitution and Template Structure
-- Variables originate from cookiecutter.json and are passed via CLI into Cookiecutter’s extra_context.
+- Variables originate from cookiecutter.json and are passed via CLI into Cookiecutter's extra_context.
 - The template uses Jinja2 templating to render filenames and content, including conditional blocks and environment variable injection.
 - Copy-without-render lists exclude certain SQL/YAML seeds from Jinja processing to preserve literal content.
 
@@ -140,7 +151,7 @@ Key variables and defaults:
 - Private index: python_index_url, python_index_name
 
 **Section sources**
-- [cookiecutter.json:1-28](file://src/dbt_dagsterizer/project_templates/luban-dagster-dbt-starrocks-code-location-source-template/cookiecutter.json#L1-L28)
+- [cookiecutter.json:1-29](file://src/dbt_dagsterizer/project_templates/luban-dagster-dbt-starrocks-code-location-source-template/cookiecutter.json#L1-L29)
 - [project.py:233-249](file://src/dbt_dagsterizer/cli_parts/project.py#L233-L249)
 
 ### Pre-Generation Hook: Validation
@@ -180,10 +191,10 @@ PruneOutputs --> Done
 ```
 
 **Diagram sources**
-- [post_gen_project.py:63-132](file://src/dbt_dagsterizer/project_templates/luban-dagster-dbt-starrocks-code-location-source-template/hooks/post_gen_project.py#L63-L132)
+- [post_gen_project.py:63-136](file://src/dbt_dagsterizer/project_templates/luban-dagster-dbt-starrocks-code-location-source-template/hooks/post_gen_project.py#L63-L136)
 
 **Section sources**
-- [post_gen_project.py:63-132](file://src/dbt_dagsterizer/project_templates/luban-dagster-dbt-starrocks-code-location-source-template/hooks/post_gen_project.py#L63-L132)
+- [post_gen_project.py:63-136](file://src/dbt_dagsterizer/project_templates/luban-dagster-dbt-starrocks-code-location-source-template/hooks/post_gen_project.py#L63-L136)
 
 ### dbt Project Configuration and StarRocks Integration
 - dbt project settings define model paths, vars, and default materialization behavior.
@@ -241,12 +252,14 @@ G["starrocks_overrides.sql"] --> D
 - [pyproject.toml.in:1-51](file://src/dbt_dagsterizer/project_templates/luban-dagster-dbt-starrocks-code-location-source-template/{{cookiecutter.output_name}}/pyproject.toml.in#L1-L51)
 - [project.py:209-222](file://src/dbt_dagsterizer/cli_parts/project.py#L209-L222)
 
-### Environment Setup Patterns and Makefile Targets
-- Makefile centralizes local development tasks: setup, install, macros synchronization, dev server, tests, DB connectivity checks, optional Docker lifecycle, ODS bootstrap/append, and dbt lifecycle commands.
+### Environment Setup Patterns and Enhanced Makefile Targets
+- Makefile centralizes local development tasks: setup, install, **refresh-dagsterizer**, macros synchronization, dev server, tests, DB connectivity checks, optional Docker lifecycle, ODS bootstrap/append, and dbt lifecycle commands.
+- **New**: refresh-dagsterizer target reinstalls the local dbt-dagsterizer package and re-syncs managed dbt macros for fast iteration workflow.
+- **Enhanced**: Conditional Docker targets based on template variables for flexible development environments.
 - DBT_VARS is required for dbt execution to supply partition window variables.
 
 **Section sources**
-- [Makefile:1-128](file://src/dbt_dagsterizer/project_templates/luban-dagster-dbt-starrocks-code-location-source-template/{{cookiecutter.output_name}}/Makefile#L1-L128)
+- [Makefile:1-134](file://src/dbt_dagsterizer/project_templates/luban-dagster-dbt-starrocks-code-location-source-template/{{cookiecutter.output_name}}/Makefile#L1-L134)
 
 ### CLI Integration and Project Generation Workflow
 - The CLI exposes a project group with list-templates, init, and gen-gitops-env commands.
@@ -282,6 +295,7 @@ PG-->>U : "Print output path"
 - Template variables drive conditional inclusion of Docker and sample dbt content.
 - Post-generation adjusts dbt profiles and cleans up unused directories.
 - Python packaging is controlled via pyproject.toml.in with optional private index injection.
+- **New**: Enhanced dependency management with refresh-dagsterizer target for local development workflow.
 
 ```mermaid
 graph TB
@@ -291,22 +305,27 @@ Post --> DBT["dbt_project/"]
 Post --> DKR["docker/"]
 Post --> PY["pyproject.toml.in"]
 PY --> Pinned["dbt-dagsterizer version pinning"]
+Refresh["refresh-dagsterizer target"] --> UV["uv sync --reinstall-package"]
+UV --> Macros["macros-sync"]
 ```
 
 **Diagram sources**
 - [cookiecutter.json:11-12](file://src/dbt_dagsterizer/project_templates/luban-dagster-dbt-starrocks-code-location-source-template/cookiecutter.json#L11-L12)
 - [post_gen_project.py:82-111](file://src/dbt_dagsterizer/project_templates/luban-dagster-dbt-starrocks-code-location-source-template/hooks/post_gen_project.py#L82-L111)
 - [pyproject.toml.in:15-20](file://src/dbt_dagsterizer/project_templates/luban-dagster-dbt-starrocks-code-location-source-template/{{cookiecutter.output_name}}/pyproject.toml.in#L15-L20)
+- [Makefile:40-44](file://src/dbt_dagsterizer/project_templates/luban-dagster-dbt-starrocks-code-location-source-template/{{cookiecutter.output_name}}/Makefile#L40-L44)
 
 **Section sources**
 - [cookiecutter.json:11-12](file://src/dbt_dagsterizer/project_templates/luban-dagster-dbt-starrocks-code-location-source-template/cookiecutter.json#L11-L12)
 - [post_gen_project.py:82-111](file://src/dbt_dagsterizer/project_templates/luban-dagster-dbt-starrocks-code-location-source-template/hooks/post_gen_project.py#L82-L111)
 - [pyproject.toml.in:15-20](file://src/dbt_dagsterizer/project_templates/luban-dagster-dbt-starrocks-code-location-source-template/{{cookiecutter.output_name}}/pyproject.toml.in#L15-L20)
+- [Makefile:40-44](file://src/dbt_dagsterizer/project_templates/luban-dagster-dbt-starrocks-code-location-source-template/{{cookiecutter.output_name}}/Makefile#L40-L44)
 
 ## Performance Considerations
 - Keep sample dbt content disabled in production-like environments to minimize disk footprint and parsing overhead.
 - Use environment-specific thread counts and timeouts in StarRocks profiles to balance throughput and stability.
 - Prefer partitioned runs with narrow windows to reduce compute and storage churn.
+- **New**: Use refresh-dagsterizer target for fast iteration during development to avoid full reinstall cycles.
 
 ## Troubleshooting Guide
 Common issues and resolutions:
@@ -315,15 +334,19 @@ Common issues and resolutions:
 - dbt manifest missing: run dbt deps and dbt parse or rely on LUBAN_DBT_PREPARE_ON_LOAD.
 - Partition variables not supplied: set DBT_VARS with min/max date/datetime for dbt execution.
 - Docker not included: regenerate with --include-docker to provision StarRocks stack.
+- **New**: Local package change not visible: run `make refresh-dagsterizer` for file:// dependency flow or restart `make dev` if already running.
+- **New**: Template change not visible: re-render the project as template changes require re-rendering regardless of package installation state.
 
 **Section sources**
 - [pre_gen_project.py:6-12](file://src/dbt_dagsterizer/project_templates/luban-dagster-dbt-starrocks-code-location-source-template/hooks/pre_gen_project.py#L6-L12)
 - [project.py:228-231](file://src/dbt_dagsterizer/cli_parts/project.py#L228-L231)
 - [Makefile:50-57](file://src/dbt_dagsterizer/project_templates/luban-dagster-dbt-starrocks-code-location-source-template/{{cookiecutter.output_name}}/Makefile#L50-L57)
 - [template_usage.md:16-18](file://docs/templates/dagster-dbt-starrocks-code-location/template_usage.md#L16-L18)
+- [local-development.md:71-77](file://docs/development/local-development.md#L71-L77)
+- [local-development.md:123-127](file://docs/development/local-development.md#L123-L127)
 
 ## Conclusion
-The dbt-dagsterizer template system provides a robust, configurable foundation for building Dagster code locations that orchestrate dbt against StarRocks. By leveraging Cookiecutter variables, pre/post hooks, and environment-aware configurations, teams can rapidly scaffold consistent projects with optional Docker and sample content. Adhering to the documented workflows and best practices ensures maintainable, version-aligned code locations.
+The dbt-dagsterizer template system provides a robust, configurable foundation for building Dagster code locations that orchestrate dbt against StarRocks. By leveraging Cookiecutter variables, pre/post hooks, and environment-aware configurations, teams can rapidly scaffold consistent projects with optional Docker and sample content. The enhanced local development workflow with the refresh-dagsterizer target streamlines the development process, enabling fast iteration between package changes and template modifications. Adhering to the documented workflows and best practices ensures maintainable, version-aligned code locations.
 
 ## Appendices
 
@@ -345,7 +368,7 @@ The dbt-dagsterizer template system provides a robust, configurable foundation f
   - dbt_project.yml uses env_var for DBT_TARGET default
 
 **Section sources**
-- [cookiecutter.json:1-28](file://src/dbt_dagsterizer/project_templates/luban-dagster-dbt-starrocks-code-location-source-template/cookiecutter.json#L1-L28)
+- [cookiecutter.json:1-29](file://src/dbt_dagsterizer/project_templates/luban-dagster-dbt-starrocks-code-location-source-template/cookiecutter.json#L1-L29)
 - [post_gen_project.py:82-111](file://src/dbt_dagsterizer/project_templates/luban-dagster-dbt-starrocks-code-location-source-template/hooks/post_gen_project.py#L82-L111)
 - [profiles.yml:2-47](file://src/dbt_dagsterizer/project_templates/luban-dagster-dbt-starrocks-code-location-source-template/{{cookiecutter.output_name}}/dbt_project/profiles.yml#L2-L47)
 - [dbt_project.yml:7-14](file://src/dbt_dagsterizer/project_templates/luban-dagster-dbt-starrocks-code-location-source-template/{{cookiecutter.output_name}}/dbt_project/dbt_project.yml#L7-L14)
@@ -355,20 +378,62 @@ The dbt-dagsterizer template system provides a robust, configurable foundation f
 - Use environment-aware profiles and avoid hardcoding credentials; rely on env_var(...) and .env files.
 - Keep sample content optional for production-like environments to reduce noise and improve performance.
 - Centralize operational tasks in Makefile targets to streamline developer onboarding and CI workflows.
+- **New**: Leverage refresh-dagsterizer target for efficient local development workflow during package iterations.
 
 **Section sources**
 - [README.md:25-31](file://docs/templates/dagster-dbt-starrocks-code-location/README.md#L25-L31)
 - [pyproject.toml.in:15-20](file://src/dbt_dagsterizer/project_templates/luban-dagster-dbt-starrocks-code-location-source-template/{{cookiecutter.output_name}}/pyproject.toml.in#L15-L20)
 - [Makefile:21-31](file://src/dbt_dagsterizer/project_templates/luban-dagster-dbt-starrocks-code-location-source-template/{{cookiecutter.output_name}}/Makefile#L21-L31)
+- [local-development.md:67-77](file://docs/development/local-development.md#L67-L77)
 
 ### Examples of Template Modification and Custom Template Creation
 - Modify dbt project defaults (paths, vars) in dbt_project.yml to align with team conventions.
 - Extend StarRocks macros to add layer-specific overrides or schema naming rules.
 - Add new Makefile targets for CI-specific tasks (linting, coverage, release).
 - Create a custom template by duplicating the existing template directory, adjusting cookiecutter.json and files, and registering it via CLI discovery.
+- **New**: Use refresh-dagsterizer target in custom templates for consistent development workflow across different project types.
 
 **Section sources**
 - [dbt_project.yml:16-35](file://src/dbt_dagsterizer/project_templates/luban-dagster-dbt-starrocks-code-location-source-template/{{cookiecutter.output_name}}/dbt_project/dbt_project.yml#L16-L35)
 - [starrocks_layer_schema.sql:1-15](file://src/dbt_dagsterizer/project_templates/luban-dagster-dbt-starrocks-code-location-source-template/{{cookiecutter.output_name}}/dbt_project/macros/dbt_dagsterizer/starrocks_layer_schema.sql#L1-L15)
-- [Makefile:17-128](file://src/dbt_dagsterizer/project_templates/luban-dagster-dbt-starrocks-code-location-source-template/{{cookiecutter.output_name}}/Makefile#L17-L128)
+- [Makefile:17-134](file://src/dbt_dagsterizer/project_templates/luban-dagster-dbt-starrocks-code-location-source-template/{{cookiecutter.output_name}}/Makefile#L17-L134)
 - [project.py:87-94](file://src/dbt_dagsterizer/cli_parts/project.py#L87-L94)
+
+### Enhanced Local Development Workflow
+**New**: The template system now supports an improved local development workflow with the refresh-dagsterizer target:
+
+#### Fast Iteration Loop
+- **Python/package code changes**: Use `make refresh-dagsterizer` to reinstall the local dbt-dagsterizer package and re-sync managed dbt macros
+- **Template changes**: Re-render the validation project as template changes require re-rendering regardless of package installation state
+
+#### Dependency Modes
+- **File URL dependency** (recommended): `"dbt-dagsterizer @ file:///path/to/dbt-dagsterizer"`
+  - Behavior: source-code changes require reinstall or `make refresh-dagsterizer`
+  - Template changes require re-rendering
+- **Editable install**: `uv pip install -e /path/to/dbt-dagsterizer`
+  - Behavior: Python source changes are picked up immediately
+  - Template changes still require re-rendering
+
+#### Practical Examples
+```bash
+# Refresh local package after source code changes
+make refresh-dagsterizer
+
+# Start development server
+make dev
+
+# Check database connectivity
+make check-db
+
+# Bootstrap ODS test tables
+make ods-test-bootstrap
+
+# Run dbt build with partition variables
+make dbt-build DBT_VARS='{"min_date":"2026-01-02","max_date":"2026-01-03"}'
+```
+
+**Section sources**
+- [Makefile:40-44](file://src/dbt_dagsterizer/project_templates/luban-dagster-dbt-starrocks-code-location-source-template/{{cookiecutter.output_name}}/Makefile#L40-L44)
+- [local-development.md:67-82](file://docs/development/local-development.md#L67-L82)
+- [local-development.md:83-109](file://docs/development/local-development.md#L83-L109)
+- [local-development.md:121-140](file://docs/development/local-development.md#L121-L140)

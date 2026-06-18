@@ -1,5 +1,7 @@
 from ...assets.dbt.translator import relation_asset_key_path
 from ...dbt.manifest import iter_models, load_manifest
+from ...partitions_registry import get_dynamic_partitions_defs
+from ...resources.dbt import get_dbt_project_dir
 from ..dbt_config import DBT_JOB_SPECS
 from .auto_config import build_auto_dbt_job_specs
 from .factory import build_dbt_asset_jobs
@@ -66,8 +68,13 @@ def _normalize_manual_job_specs(job_specs: list[dict]) -> list[dict]:
 def get_dbt_jobs_by_name():
     global _dbt_jobs_by_name
     if _dbt_jobs_by_name is None:
+        dbt_project_dir = get_dbt_project_dir()
+        dynamic_partitions_defs = get_dynamic_partitions_defs(dbt_project_dir)
         manual_specs = _normalize_manual_job_specs(DBT_JOB_SPECS)
-        _dbt_jobs_by_name = build_dbt_asset_jobs(build_auto_dbt_job_specs() + manual_specs)
+        _dbt_jobs_by_name = build_dbt_asset_jobs(
+            build_auto_dbt_job_specs() + manual_specs,
+            dynamic_partitions_defs=dynamic_partitions_defs,
+        )
     return _dbt_jobs_by_name
 
 

@@ -17,7 +17,16 @@
 - [src/dbt_dagsterizer/resources/__init__.py](file://src/dbt_dagsterizer/resources/__init__.py)
 - [src/dbt_dagsterizer/jobs/dbt/factory.py](file://src/dbt_dagsterizer/jobs/dbt/factory.py)
 - [src/dbt_dagsterizer/schedules/dbt/factory.py](file://src/dbt_dagsterizer/schedules/dbt/factory.py)
+- [docs/development/local-development.md](file://docs/development/local-development.md)
+- [docs/development/package-development.md](file://docs/development/package-development.md)
 </cite>
+
+## Update Summary
+**Changes Made**
+- Consolidated package development documentation by referencing the new comprehensive local-development.md guide
+- Streamlined development workflow documentation to centralize setup and contribution processes
+- Updated development environment setup to point to unified documentation sources
+- Enhanced contribution workflows with centralized development guidance
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -36,10 +45,12 @@
 14. [Conclusion](#conclusion)
 
 ## Introduction
-This development guide supports contributors to dbt-dagsterizer. It covers environment setup, testing, linting, CI preparation, code organization, quality practices, and extension patterns. It also documents the CLI surface, orchestration configuration model, and runtime API used by Dagster code locations.
+This development guide supports contributors to dbt-dagsterizer. It covers environment setup, testing, linting, CI preparation, code organization, quality practices, and extension patterns. The guide now consolidates development documentation by referencing the comprehensive local-development.md guide for streamlined workflow management. It documents the CLI surface, orchestration configuration model, and runtime API used by Dagster code locations.
+
+**Updated** Consolidated development documentation to reference unified local-development.md guide for streamlined workflow management
 
 ## Project Structure
-The repository is a Python package organized around a CLI, runtime API, orchestration configuration, and modular subsystems for assets, jobs, schedules, sensors, and resources. The Makefile and pyproject.toml define development tasks and packaging.
+The repository is a Python package organized around a CLI, runtime API, orchestration configuration, and modular subsystems for assets, jobs, schedules, sensors, and resources. The Makefile and pyproject.toml define development tasks and packaging. Development workflow documentation is now centralized in the docs/development directory.
 
 ```mermaid
 graph TB
@@ -51,6 +62,11 @@ MAKE["Makefile"]
 PYPROJ["pyproject.toml"]
 README["README.md"]
 end
+subgraph "Development Docs"
+LOCAL_DEV["docs/development/local-development.md"]
+PKG_DEV["docs/development/package-development.md"]
+CODE_TOUR["docs/development/codebase-tour.md"]
+end
 SRC --> CLI["cli_parts/app.py<br/>cli.py"]
 SRC --> API["api.py"]
 SRC --> ORCH["orchestration_config.py"]
@@ -61,6 +77,9 @@ SRC --> RES["resources/__init__.py"]
 SRC --> ASSETS["assets/__init__.py"]
 SRC --> JOBS["jobs/dbt/factory.py"]
 SRC --> SCHED["schedules/dbt/factory.py"]
+LOCAL_DEV -.-> SRC
+PKG_DEV -.-> SRC
+CODE_TOUR -.-> SRC
 ```
 
 **Diagram sources**
@@ -75,11 +94,15 @@ SRC --> SCHED["schedules/dbt/factory.py"]
 - [src/dbt_dagsterizer/assets/__init__.py:1-13](file://src/dbt_dagsterizer/assets/__init__.py#L1-L13)
 - [src/dbt_dagsterizer/jobs/dbt/factory.py:1-107](file://src/dbt_dagsterizer/jobs/dbt/factory.py#L1-L107)
 - [src/dbt_dagsterizer/schedules/dbt/factory.py:1-99](file://src/dbt_dagsterizer/schedules/dbt/factory.py#L1-L99)
+- [docs/development/local-development.md](file://docs/development/local-development.md)
+- [docs/development/package-development.md](file://docs/development/package-development.md)
 
 **Section sources**
 - [README.md:1-101](file://README.md#L1-L101)
 - [Makefile:1-25](file://Makefile#L1-L25)
 - [pyproject.toml:1-50](file://pyproject.toml#L1-L50)
+- [docs/development/local-development.md](file://docs/development/local-development.md)
+- [docs/development/package-development.md](file://docs/development/package-development.md)
 
 ## Core Components
 - CLI entrypoint builds a Click-based CLI with subcommands for metadata orchestration, macros, and project scaffolding.
@@ -88,6 +111,9 @@ SRC --> SCHED["schedules/dbt/factory.py"]
 - Environment utilities support .env parsing and temporary environment variable scoping during dbt operations.
 - Manifest inputs capture dbt target and .env freshness to drive manifest refresh decisions.
 - Assets, Jobs, Schedules, Sensors, and Resources are wired via module-level factories and getters.
+- Development workflow is now centralized in comprehensive documentation guides.
+
+**Updated** Development workflow documentation consolidated into unified local-development.md guide
 
 **Section sources**
 - [src/dbt_dagsterizer/cli_parts/app.py:1-29](file://src/dbt_dagsterizer/cli_parts/app.py#L1-L29)
@@ -98,9 +124,10 @@ SRC --> SCHED["schedules/dbt/factory.py"]
 - [src/dbt_dagsterizer/manifest_inputs.py:1-91](file://src/dbt_dagsterizer/manifest_inputs.py#L1-L91)
 - [src/dbt_dagsterizer/assets/__init__.py:1-13](file://src/dbt_dagsterizer/assets/__init__.py#L1-L13)
 - [src/dbt_dagsterizer/resources/__init__.py:1-10](file://src/dbt_dagsterizer/resources/__init__.py#L1-L10)
+- [docs/development/local-development.md](file://docs/development/local-development.md)
 
 ## Architecture Overview
-The system separates concerns across CLI, runtime API, and orchestration configuration. The CLI orchestrates metadata updates and validation; the runtime API constructs Dagster Definitions dynamically from dbt artifacts and configuration.
+The system separates concerns across CLI, runtime API, and orchestration configuration. The CLI orchestrates metadata updates and validation; the runtime API constructs Dagster Definitions dynamically from dbt artifacts and configuration. Development workflow is now streamlined through centralized documentation.
 
 ```mermaid
 graph TB
@@ -113,6 +140,9 @@ API --> JOBS_GET["Jobs Factory<br/>jobs/dbt/factory.py"]
 API --> SCHED_GET["Schedules Factory<br/>schedules/dbt/factory.py"]
 ENV_UTIL["Env Utils<br/>env_utils.py"] --> MAN_PREP
 MAN_PREP --> MAN_INPUTS["Manifest Inputs<br/>manifest_inputs.py"]
+LOCAL_DEV["Local Development<br/>local-development.md"] -.-> CLI_APP
+LOCAL_DEV -.-> API
+LOCAL_DEV -.-> ORCH_CFG
 ```
 
 **Diagram sources**
@@ -126,6 +156,7 @@ MAN_PREP --> MAN_INPUTS["Manifest Inputs<br/>manifest_inputs.py"]
 - [src/dbt_dagsterizer/schedules/dbt/factory.py:1-99](file://src/dbt_dagsterizer/schedules/dbt/factory.py#L1-L99)
 - [src/dbt_dagsterizer/env_utils.py:1-78](file://src/dbt_dagsterizer/env_utils.py#L1-L78)
 - [src/dbt_dagsterizer/manifest_inputs.py:1-91](file://src/dbt_dagsterizer/manifest_inputs.py#L1-L91)
+- [docs/development/local-development.md](file://docs/development/local-development.md)
 
 ## Detailed Component Analysis
 
@@ -275,8 +306,6 @@ P --> SCRIPT["console_script: dbt-dagsterizer"]
 - Resource tagging: Apply Kubernetes run tags to leverage cluster scheduling and resource policies.
 - Logging: Stream dbt CLI events to reduce polling overhead and improve observability.
 
-[No sources needed since this section provides general guidance]
-
 ## Testing Strategies
 - Unit tests live under tests/. Configure pytest discovery via pyproject.
 - Use Makefile targets to run tests locally.
@@ -298,7 +327,7 @@ Recommended local workflow:
 - Ensure tests pass and ruff check passes locally.
 - Open a pull request with a clear description and rationale.
 
-[No sources needed since this section doesn't analyze specific files]
+**Updated** Development workflow documentation consolidated into unified local-development.md guide for streamlined contribution processes
 
 ## Debugging and Profiling
 - Use temporary environment variables during dbt operations to isolate credentials and targets.
@@ -323,7 +352,7 @@ Recommended local workflow:
 ### Adding a New Job Type
 - Extend the jobs factory to support a new job specification shape.
 - Add validation and selection logic similar to existing asset and dbt_cli job builders.
-- Wire the new job into the runtime API’s job getter.
+- Wire the new job into the runtime API's job getter.
 
 **Section sources**
 - [src/dbt_dagsterizer/jobs/dbt/factory.py:73-107](file://src/dbt_dagsterizer/jobs/dbt/factory.py#L73-L107)
@@ -331,7 +360,7 @@ Recommended local workflow:
 ### Introducing a New Schedule Type
 - Add a builder in the schedules factory mirroring daily partitioned schedules.
 - Support partition offsets and lookbacks appropriate to the new type.
-- Register the schedule in the runtime API’s schedule getter.
+- Register the schedule in the runtime API's schedule getter.
 
 **Section sources**
 - [src/dbt_dagsterizer/schedules/dbt/factory.py:51-99](file://src/dbt_dagsterizer/schedules/dbt/factory.py#L51-L99)
@@ -355,4 +384,4 @@ Recommended local workflow:
 - [README.md:63-79](file://README.md#L63-L79)
 
 ## Conclusion
-This guide outlined the development environment, architecture, and contribution practices for dbt-dagsterizer. By following the Makefile targets, linting, and testing guidance, contributors can reliably extend the CLI, runtime API, and orchestration model while maintaining backward compatibility and performance.
+This guide outlined the development environment, architecture, and contribution practices for dbt-dagsterizer. The development workflow documentation has been consolidated into the comprehensive local-development.md guide, streamlining setup and contribution processes. By following the Makefile targets, linting, and testing guidance, contributors can reliably extend the CLI, runtime API, and orchestration model while maintaining backward compatibility and performance.

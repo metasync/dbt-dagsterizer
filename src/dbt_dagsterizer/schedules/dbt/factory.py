@@ -48,7 +48,63 @@ def _build_daily_partitioned_schedule(
     return _schedule
 
 
-def build_dbt_schedules(schedule_specs, jobs_by_name):
+def _build_dynamic_partitioned_schedule(
+    *,
+    name: str,
+    cron_schedule: str,
+    job,
+    partition_keys: list[str],
+    dedupe_across_ticks: bool,
+    default_status: dg.DefaultScheduleStatus,
+):
+    """Build a schedule for dynamic partitions.
+    
+    Emits RunRequests for all dynamic partition keys on each scheduled tick.
+    
+    Args:
+        name: Schedule name
+        cron_schedule: Cron expression for schedule timing
+        job: Dagster job to execute
+        partition_keys: List of partition keys to emit RunRequests for
+        dedupe_across_ticks: Whether to dedupe run keys across ticks
+        default_status: Initial schedule status
+    
+    Returns:
+        A schedule definition function
+    """
+    @dg.schedule(
+        name=name,
+        cron_schedule=cron_schedule,
+        job=job,
+        default_status=default_status,
+    )
+    def _schedule(context):
+        scheduled_time = context.scheduled_execution_time or datetime.now(timezone.utc)
+        run_requests = []
+        
+        for partition_key in partition_keys:
+            run_key = _with_optional_tick_suffix(
+                run_key=f"{name}:{partition_key}",
+                scheduled_time=scheduled_time,
+                dedupe_across_ticks=dedupe_across_ticks,
+            )
+            run_requests.append(
+                dg.RunRequest(
+                    partition_key=partition_key,
+                    run_key=run_key,
+                )
+            )
+        
+        return run_requests
+    
+    return _schedule
+
+
+def build_dbt_schedules(
+    schedule_specs,
+    jobs_by_name,
+    dynamic_partitions_defs: dict[str, dg.PartitionsDefinition] | None = None,
+):
     duplicated = set()
     seen = set()
     for spec in schedule_specs:

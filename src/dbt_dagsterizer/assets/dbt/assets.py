@@ -23,6 +23,8 @@ from ...otel import (
     otel_span,
     otel_transaction_span,
 )
+from ...partitions import get_daily_partitions_def
+from ...partitions_registry import get_dynamic_partitions_defs
 from ...resources.dbt import get_dbt_project_dir
 from ..sources.automation import load_automation_observable_sources
 from .prepare import prepare_manifest_if_missing
@@ -61,9 +63,16 @@ def get_dbt_assets():
     )
     orch_cfg = load_orch(orch_cfg_path)
     orch_index = index_orch(orch_cfg)
+    
+    # Get dynamic partition definitions from registry
+    dynamic_partitions_defs = get_dynamic_partitions_defs(dbt_project_dir)
+    
+    # Get daily partitions definition (required for asset-level partitions)
+    daily_partitions_def = get_daily_partitions_def()
 
     translator = LubanDagsterDbtTranslator(
-        daily_partitions_def=None,
+        daily_partitions_def=daily_partitions_def,
+        dynamic_partitions_defs=dynamic_partitions_defs,
         automation_observable_tables=automation_observable_tables,
         partitions_by_model=orch_index.partitions_by_model,
     )

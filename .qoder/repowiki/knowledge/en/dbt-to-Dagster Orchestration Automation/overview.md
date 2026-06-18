@@ -1,1 +1,0 @@
-Automates Dagster asset, job, schedule, and sensor generation from dbt project metadata and a declarative orchestration YAML configuration.

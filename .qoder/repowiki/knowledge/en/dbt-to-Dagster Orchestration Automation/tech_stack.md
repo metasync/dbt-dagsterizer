@@ -1,1 +1,0 @@
-Uses `dagster-dbt` for core integration, `dbt-core` and `dbt-starrocks` for manifest parsing and execution, `cookiecutter` for project templating, and `ruamel.yaml` for robust YAML manipulation.

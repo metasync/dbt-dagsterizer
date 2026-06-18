@@ -8,6 +8,13 @@ from typing import Any
 from ruamel.yaml import YAML
 
 
+@dataclass(frozen=True)
+class DynamicPartitionConfig:
+    """Configuration for a dynamic partition definition."""
+    name: str
+    initial_partition_keys: list[str]
+
+
 def _yaml() -> YAML:
     y = YAML()
     y.preserve_quotes = True
@@ -104,26 +111,51 @@ def _ensure_list(parent: MutableMapping[str, Any], key: str) -> list[Any]:
 
 @dataclass(frozen=True)
 class OrchestrationIndex:
-    partitions_by_model: dict[str, str]
+    partitions_by_model: dict[str, str]  # model -> "daily"|"dynamic:name"|"unpartitioned"
+    dynamic_partitions: dict[str, DynamicPartitionConfig]  # partition_name -> config
     asset_job_models: set[str]
     group_job_by_model: dict[str, str]
 
 
 def index(data: Mapping[str, Any]) -> OrchestrationIndex:
     partitions_by_model: dict[str, str] = {}
+    dynamic_partitions: dict[str, DynamicPartitionConfig] = {}
 
     partitions = data.get("partitions")
     if isinstance(partitions, Mapping):
+        # Process daily and unpartitioned partitions
         for p_type, models in partitions.items():
             if not isinstance(p_type, str):
                 continue
-            if p_type not in {"daily", "unpartitioned"}:
-                continue
-            if not isinstance(models, list):
-                continue
-            for m in models:
-                if isinstance(m, str) and m.strip():
-                    partitions_by_model[m.strip()] = p_type
+            if p_type in {"daily", "unpartitioned"}:
+                if not isinstance(models, list):
+                    continue
+                for m in models:
+                    if isinstance(m, str) and m.strip():
+                        partitions_by_model[m.strip()] = p_type
+        
+        # Process dynamic partitions
+        if "dynamic" in partitions:
+            dynamic_defs = partitions["dynamic"]
+            if isinstance(dynamic_defs, list):
+                for d in dynamic_defs:
+                    if not isinstance(d, Mapping):
+                        continue
+                    name = d.get("name")
+                    initial_keys = d.get("initial_partition_keys")
+                    if isinstance(name, str) and name.strip() and isinstance(initial_keys, list):
+                        name_str = name.strip()
+                        partition_spec = f"dynamic:{name_str}"
+                        dynamic_partitions[name_str] = DynamicPartitionConfig(
+                            name=name_str,
+                            initial_partition_keys=initial_keys,
+                        )
+                        # Add models assigned to this dynamic partition
+                        models = d.get("models")
+                        if isinstance(models, list):
+                            for m in models:
+                                if isinstance(m, str) and m.strip():
+                                    partitions_by_model[m.strip()] = partition_spec
 
     asset_job_models: set[str] = set()
     asset_jobs = data.get("asset_jobs")
@@ -153,33 +185,79 @@ def index(data: Mapping[str, Any]) -> OrchestrationIndex:
 
     return OrchestrationIndex(
         partitions_by_model=partitions_by_model,
+        dynamic_partitions=dynamic_partitions,
         asset_job_models=asset_job_models,
         group_job_by_model=group_job_by_model,
     )
 
 
 def set_partition(*, data: MutableMapping[str, Any], model: str, partition: str | None) -> None:
+    """Set partition for a model.
+    
+    Args:
+        data: Orchestration config dict
+        model: Model name
+        partition: Partition spec ("daily", "unpartitioned", "dynamic:name", or None)
+    """
     model = model.strip()
     if not model:
         return
 
     partitions = _ensure_mapping(data, "partitions")
+    
+    # Remove model from all existing partition assignments (daily, unpartitioned, and dynamic)
     for p_type in ["daily", "unpartitioned"]:
         models = partitions.get(p_type)
         if isinstance(models, list):
             partitions[p_type] = [m for m in models if not (isinstance(m, str) and m.strip() == model)]
+    
+    # Remove from any dynamic partitions
+    if "dynamic" in partitions and isinstance(partitions["dynamic"], list):
+        for d in partitions["dynamic"]:
+            if isinstance(d, Mapping) and "models" in d and isinstance(d["models"], list):
+                d["models"] = [m for m in d["models"] if not (isinstance(m, str) and m.strip() == model)]
 
     if partition is None:
         return
+    
+    # Validate partition spec
     if partition not in {"daily", "unpartitioned"}:
-        raise ValueError("partition must be one of daily|unpartitioned")
+        if not partition.startswith("dynamic:"):
+            raise ValueError("partition must be one of daily|unpartitioned|dynamic:name")
+        # Validate that the dynamic partition exists
+        dynamic_name = partition.split(":", 1)[1]
+        dynamic_list = partitions.get("dynamic", [])
+        if isinstance(dynamic_list, list):
+            found = False
+            for d in dynamic_list:
+                if isinstance(d, Mapping) and d.get("name") == dynamic_name:
+                    found = True
+                    break
+            if not found:
+                raise ValueError(f"Unknown dynamic partition: {dynamic_name}")
 
-    models = partitions.get(partition)
-    if not isinstance(models, list):
-        models = []
-        partitions[partition] = models
-    if model not in [m for m in models if isinstance(m, str)]:
-        models.append(model)
+    # For daily/unpartitioned, add to the list
+    if partition in {"daily", "unpartitioned"}:
+        models = partitions.get(partition)
+        if not isinstance(models, list):
+            models = []
+            partitions[partition] = models
+        if model not in [m for m in models if isinstance(m, str)]:
+            models.append(model)
+    # For dynamic partitions, add to the specific dynamic partition's models list
+    elif partition.startswith("dynamic:"):
+        dynamic_name = partition.split(":", 1)[1]
+        dynamic_list = partitions.get("dynamic", [])
+        if isinstance(dynamic_list, list):
+            for d in dynamic_list:
+                if isinstance(d, Mapping) and d.get("name") == dynamic_name:
+                    if "models" not in d:
+                        d["models"] = []
+                    if not isinstance(d["models"], list):
+                        d["models"] = []
+                    if model not in [m for m in d["models"] if isinstance(m, str)]:
+                        d["models"].append(model)
+                    break
 
 
 def set_asset_job(*, data: MutableMapping[str, Any], model: str, enabled: bool) -> None:
@@ -218,7 +296,8 @@ def set_group_job(
         job.pop("partitions", None)
     else:
         if partitions not in {"daily", "unpartitioned"}:
-            raise ValueError("partitions must be one of daily|unpartitioned")
+            if not partitions.startswith("dynamic:"):
+                raise ValueError("partitions must be one of daily|unpartitioned|dynamic:name")
         job["partitions"] = partitions
 
 
@@ -355,6 +434,70 @@ def set_partition_change_propagation(
 
     propagations_filtered.append(entry)
     pc["propagators"] = propagations_filtered
+
+
+def set_dynamic_partition(
+    *,
+    data: MutableMapping[str, Any],
+    name: str,
+    initial_partition_keys: list[str],
+) -> None:
+    """Add or update a dynamic partition definition.
+    
+    Args:
+        data: Orchestration config dict
+        name: Name of the dynamic partition
+        initial_partition_keys: List of initial partition keys
+    """
+    name = name.strip()
+    if not name:
+        raise ValueError("Dynamic partition name must be non-empty")
+    if not initial_partition_keys:
+        raise ValueError("initial_partition_keys must be non-empty")
+    
+    partitions = _ensure_mapping(data, "partitions")
+    dynamic_list = _ensure_list(partitions, "dynamic")
+    
+    # Remove existing entry with same name
+    dynamic_list[:] = [d for d in dynamic_list if not (isinstance(d, Mapping) and d.get("name") == name)]
+    
+    # Add new entry
+    dynamic_list.append({
+        "name": name,
+        "initial_partition_keys": list(initial_partition_keys),
+    })
+
+
+def remove_dynamic_partition(
+    *,
+    data: MutableMapping[str, Any],
+    name: str,
+) -> bool:
+    """Remove a dynamic partition definition.
+    
+    Args:
+        data: Orchestration config dict
+        name: Name of the dynamic partition to remove
+    
+    Returns:
+        True if removed, False if not found
+    """
+    name = name.strip()
+    if not name:
+        return False
+    
+    partitions = data.get("partitions")
+    if not isinstance(partitions, MutableMapping):
+        return False
+    
+    dynamic_list = partitions.get("dynamic")
+    if not isinstance(dynamic_list, list):
+        return False
+    
+    original_len = len(dynamic_list)
+    partitions["dynamic"] = [d for d in dynamic_list if not (isinstance(d, Mapping) and d.get("name") == name)]
+    
+    return len(partitions["dynamic"]) < original_len
 
 
 def derive_job_name_for_model(index: OrchestrationIndex, *, model: str) -> str | None:

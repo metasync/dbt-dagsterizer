@@ -1,3 +1,4 @@
-- Factory functions (e.g., `build_dbt_partition_change_sensors`, `build_partition_propagation_sensors`) return lists of Dagster definitions and enforce unique naming constraints via internal duplicate detection.
-- Asset keys are derived from physical database relations (database/schema/identifier) rather than logical dbt names to ensure stability across different code locations referencing the same physical table.
-- Orchestration intent is externalized into a `dagsterization.yml` file, which is loaded and indexed at startup to drive the dynamic generation of partitions, jobs, and sensors.
+- Factory functions named `build_*` or `get_*` return Dagster definitions (assets, jobs, sensors) by composing lower-level components and reading from the orchestration config.
+- Orchestration configuration (`dagsterization.yml`) is loaded, indexed, and validated against the dbt manifest before any Dagster definitions are constructed.
+- Dagster resources (dbt, starrocks) are instantiated via `make_*_resource` functions that read connection details from environment variables.
+- Partition specifications use a consistent string format ('daily', 'unpartitioned', 'dynamic:<name>') resolved by a central `get_partitions_def` utility.

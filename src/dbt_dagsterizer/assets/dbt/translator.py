@@ -45,13 +45,15 @@ class LubanDagsterDbtTranslator(DagsterDbtTranslator):
     def __init__(
         self,
         daily_partitions_def: Optional[dg.PartitionsDefinition],
-        automation_observable_tables: set[str],
-        partitions_by_model: dict[str, str],
+        dynamic_partitions_defs: dict[str, dg.PartitionsDefinition] | None = None,
+        automation_observable_tables: set[str] | None = None,
+        partitions_by_model: dict[str, str] | None = None,
     ):
         super().__init__()
         self.daily_partitions_def = daily_partitions_def
-        self.automation_observable_tables = automation_observable_tables
-        self.partitions_by_model = partitions_by_model
+        self.dynamic_partitions_defs = dynamic_partitions_defs or {}
+        self.automation_observable_tables = automation_observable_tables or set()
+        self.partitions_by_model = partitions_by_model or {}
         self.propagator_mode = os.getenv(
             "LUBAN_PARTITION_CHANGE_PROPAGATOR_MODE", "sensor").strip().lower()
 
@@ -106,10 +108,32 @@ class LubanDagsterDbtTranslator(DagsterDbtTranslator):
         return None
 
     def get_partitions_def(self, dbt_resource_props: Mapping[str, Any]) -> Optional[dg.PartitionsDefinition]:
+        """Return partition definitions for individual models.
+        
+        This enables partitions to be visible on the Assets page in the Dagster UI.
+        
+        IMPORTANT: This only works when ALL models in the same @dbt_assets have the SAME
+        partition type (e.g., all daily, or all unpartitioned). If you have mixed partition
+        types (daily + dynamic + unpartitioned), keep returning None and handle partitions
+        at the job/schedule level instead.
+        """
+        resource_type = dbt_resource_props.get("resource_type")
+        if resource_type != "model":
+            return None
+        
         name = dbt_resource_props.get("name")
-        if name and self.partitions_by_model.get(str(name)) == "daily":
-            if self.daily_partitions_def is None:
-                self.daily_partitions_def = get_daily_partitions_def()
+        if not name:
+            return None
+        
+        # Look up partition type for this model
+        partition_type = self.partitions_by_model.get(name)
+        
+        if partition_type == "daily":
             return self.daily_partitions_def
-
+        
+        if partition_type and partition_type.startswith("dynamic:"):
+            partition_name = partition_type.split(":", 1)[1]
+            return self.dynamic_partitions_defs.get(partition_name)
+        
+        # Model is unpartitioned or partition type not defined
         return None

@@ -14,6 +14,12 @@
 - [pyproject.toml](file://pyproject.toml)
 </cite>
 
+## Update Summary
+**Changes Made**
+- Added comprehensive documentation for the new --local-dbt-dagsterizer-path option in project initialization
+- Documented dependency modes and mutual exclusivity constraints with existing version options
+- Updated project init command documentation with new validation logic and error handling
+
 ## Table of Contents
 1. [Introduction](#introduction)
 2. [Project Structure](#project-structure)
@@ -143,6 +149,7 @@ MC --> CMN
     - --namespace: optional namespace used for defaults (e.g., OTEL service naming)
     - --dagster-version: pins Dagster version in generated dependencies
     - --dbt-dagsterizer-version: pins dbt-dagsterizer in generated dependencies (default from installed version if available)
+    - --local-dbt-dagsterizer-path: specify local dbt-dagsterizer checkout path for dependency resolution
     - --no-pin-dbt-dagsterizer: do not pin dbt-dagsterizer (mutually exclusive with --dbt-dagsterizer-version)
     - --default-env: default environment string
     - --code-location-port: port for code location server
@@ -150,9 +157,27 @@ MC --> CMN
     - --include-docker: include Docker Compose and Make targets
     - --author-name, --author-email: metadata for generated project
     - --python-index-url, --python-index-name: Python package index configuration
+  - Dependency modes and mutual exclusivity:
+    - Mode 1: Local development mode
+      - Uses --local-dbt-dagsterizer-path to point to a local dbt-dagsterizer checkout
+      - Validates that the path contains a valid pyproject.toml with project.name = "dbt-dagsterizer"
+      - Sets dbt-dagsterizer dependency to a file URL pointing to the local checkout
+      - Mutually exclusive with --no-pin-dbt-dagsterizer and --dbt-dagsterizer-version
+    - Mode 2: Pinned version mode
+      - Uses --dbt-dagsterizer-version to pin a specific version
+      - Sets dbt-dagsterizer dependency to the specified version
+      - Mutually exclusive with --no-pin-dbt-dagsterizer and --local-dbt-dagsterizer-path
+    - Mode 3: No pin mode
+      - Uses --no-pin-dbt-dagsterizer to skip pinning
+      - Sets dbt-dagsterizer dependency to empty string (unpinned)
+      - Mutually exclusive with --dbt-dagsterizer-version and --local-dbt-dagsterizer-path
+    - Mode 4: Default mode
+      - Uses the installed dbt-dagsterizer version if available
+      - Sets dbt-dagsterizer dependency to the detected version
   - Behavior:
     - Validates inputs and normalizes names.
     - Resolves template directory from embedded resources.
+    - Applies dependency mode based on provided options.
     - Calls cookiecutter with extra context.
     - Writes the output directory path to stdout.
   - Error conditions:
@@ -160,6 +185,8 @@ MC --> CMN
     - Mutually exclusive flags
     - Existing output directory without --force
     - Invalid normalized names
+    - Invalid local dbt-dagsterizer path (missing pyproject.toml, wrong project name, non-existent, or not a directory)
+    - Invalid TOML parsing in local dbt-dagsterizer checkout
 
 - project gen-gitops-env
   - Purpose: Generate GitOps Kustomize overlays with ConfigMap and Secret.
@@ -181,6 +208,9 @@ MC --> CMN
 
 **Section sources**
 - [project.py:106-307](file://src/dbt_dagsterizer/cli_parts/project.py#L106-L307)
+- [project.py:192-336](file://src/dbt_dagsterizer/cli_parts/project.py#L192-L336)
+- [project.py:83-139](file://src/dbt_dagsterizer/cli_parts/project.py#L83-L139)
+- [project.py:242-276](file://src/dbt_dagsterizer/cli_parts/project.py#L242-L276)
 - [cli.md:63-118](file://docs/concepts/cli.md#L63-L118)
 
 ### meta group
@@ -388,8 +418,7 @@ MC --> CMN
 - Manifest preparation (--prepare) may trigger dbt parse; cache sidecar inputs reduce unnecessary refreshes.
 - Using --tag requires manifest loading; batch operations where possible to avoid repeated parsing.
 - Macros sync copies files; --force may overwrite existing files.
-
-[No sources needed since this section provides general guidance]
+- Local dbt-dagsterizer path validation performs filesystem checks and TOML parsing during project initialization.
 
 ## Troubleshooting Guide
 Common issues and resolutions:
@@ -397,11 +426,14 @@ Common issues and resolutions:
   - Symptom: Failure indicating cookiecutter is required.
   - Resolution: Install cookiecutter and retry.
 - Mutually exclusive flags
-  - Examples: --no-pin-dbt-dagsterizer with --dbt-dagsterizer-version.
-  - Resolution: Use only one of the conflicting options.
+  - Examples: --no-pin-dbt-dagsterizer with --dbt-dagsterizer-version, --local-dbt-dagsterizer-path with --no-pin-dbt-dagsterizer.
+  - Resolution: Use only one of the conflicting options. Choose either a pinned version, local path, or no pin mode.
 - Output directory exists
   - Symptom: Failure when output directory already exists.
   - Resolution: Use --force or choose a different --output-name.
+- Invalid local dbt-dagsterizer path
+  - Symptom: Failure when --local-dbt-dagsterizer-path points to invalid location or checkout.
+  - Resolution: Ensure the path exists, is a directory, contains a valid pyproject.toml with project.name = "dbt-dagsterizer".
 - No models selected
   - Symptom: Failure when neither --models nor --tag yields selections.
   - Resolution: Provide --models or supply a valid --tag with --prepare.
@@ -417,6 +449,7 @@ Common issues and resolutions:
 
 **Section sources**
 - [project.py:187-259](file://src/dbt_dagsterizer/cli_parts/project.py#L187-L259)
+- [project.py:242-276](file://src/dbt_dagsterizer/cli_parts/project.py#L242-L276)
 - [meta.py:91-136](file://src/dbt_dagsterizer/cli_parts/meta.py#L91-L136)
 - [meta.py:145-219](file://src/dbt_dagsterizer/cli_parts/meta.py#L145-L219)
 - [meta.py:229-262](file://src/dbt_dagsterizer/cli_parts/meta.py#L229-L262)
@@ -429,9 +462,7 @@ Common issues and resolutions:
 - [validation.py:275-310](file://src/dbt_dagsterizer/cli_parts/validation.py#L275-L310)
 
 ## Conclusion
-The dbt-dagsterizer CLI provides a cohesive workflow for initializing projects, managing orchestration intent in a dedicated YAML file, and synchronizing template-managed macros. It validates early to prevent runtime issues and integrates with dbt manifest preparation. Use the examples and guidance here to adopt the CLI effectively in local development and CI/CD pipelines.
-
-[No sources needed since this section summarizes without analyzing specific files]
+The dbt-dagsterizer CLI provides a cohesive workflow for initializing projects, managing orchestration intent in a dedicated YAML file, and synchronizing template-managed macros. It validates early to prevent runtime issues and integrates with dbt manifest preparation. The new --local-dbt-dagsterizer-path option enables flexible dependency management for development workflows. Use the examples and guidance here to adopt the CLI effectively in local development and CI/CD pipelines.
 
 ## Appendices
 
@@ -451,6 +482,9 @@ The dbt-dagsterizer CLI provides a cohesive workflow for initializing projects, 
 - Project initialization
   - List templates: dbt-dagsterizer project list-templates
   - Initialize project: dbt-dagsterizer project init --output-dir . --project-name "Orders Analytics" --namespace "metasync" --author-name "You" --author-email "you@example.com"
+  - Initialize project with local dbt-dagsterizer path: dbt-dagsterizer project init --output-dir . --project-name "Orders Analytics" --local-dbt-dagsterizer-path ~/dev/dbt-dagsterizer
+  - Initialize project with pinned version: dbt-dagsterizer project init --output-dir . --project-name "Orders Analytics" --dbt-dagsterizer-version 0.1.0
+  - Initialize project without pin: dbt-dagsterizer project init --output-dir . --project-name "Orders Analytics" --no-pin-dbt-dagsterizer
 - Orchestration management
   - Initialize orchestration file: dbt-dagsterizer meta init
   - Create grouped job: dbt-dagsterizer meta job --models fact_orders_daily,fact_customer_orders_daily --name daily_facts_job --include-upstream --partitions daily
@@ -474,7 +508,10 @@ The dbt-dagsterizer CLI provides a cohesive workflow for initializing projects, 
 - Use --parse after edits to immediately reflect changes in the manifest.
 - Integrate macros sync into CI to keep dbt macros aligned with templates.
 - Generate GitOps artifacts with project gen-gitops-env and commit outputs to your GitOps repository.
+- Use --local-dbt-dagsterizer-path for development workflows to test against local changes.
+- Implement dependency mode selection based on environment: local path for development, pinned version for production, no pin for flexibility.
 
 **Section sources**
 - [cli.md:300-310](file://docs/concepts/cli.md#L300-L310)
 - [project.py:280-304](file://src/dbt_dagsterizer/cli_parts/project.py#L280-L304)
+- [project.py:242-276](file://src/dbt_dagsterizer/cli_parts/project.py#L242-L276)

@@ -1,4 +1,4 @@
-- CLI installation: `uv tool install dbt-dagsterizer`.
-- Project scaffolding: `dbt-dagsterizer project init --project-name <name>`.
-- Orchestration bootstrap: `dbt-dagsterizer meta init --parse` followed by `dbt-dagsterizer meta validate --prepare`.
-- Development: `uv sync --dev` and `uv run pytest`.
+- **CLI Installation**: Recommended via `uv tool install dbt-dagsterizer` for global access to `dbt-dagsterizer` commands.
+- **Project Initialization**: Use `dbt-dagsterizer project init --project-name <name>` to scaffold a new code location with embedded templates.
+- **Metadata Management**: Run `dbt-dagsterizer meta init --parse` to generate the initial `dagsterization.yml` and dbt manifest.
+- **Development Setup**: Use `uv sync --dev` to install dependencies and `uv run pytest` for testing.

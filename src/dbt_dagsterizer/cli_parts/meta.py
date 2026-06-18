@@ -85,7 +85,7 @@ def build_meta_group() -> click.Group:
     @click.option("--tag", "tag_", default="", help="Select models by existing dbt tag")
     @click.option("--name", "job_name", required=True)
     @click.option("--include-upstream/--no-include-upstream", default=False, show_default=True)
-    @click.option("--partitions", default="", help="daily|unpartitioned|none")
+    @click.option("--partitions", default="", help="daily|unpartitioned|dynamic:name|none")
     @click.option("--prepare/--no-prepare", default=True, show_default=True)
     @click.option("--parse/--no-parse", default=False, show_default=True)
     def meta_job(
@@ -115,7 +115,9 @@ def build_meta_group() -> click.Group:
 
         partitions_value = partitions.strip().lower() or None
         if partitions_value is not None and partitions_value not in {"daily", "unpartitioned", "none"}:
-            raise click.ClickException("--partitions must be one of daily|unpartitioned|none")
+            # Check if it's a dynamic partition spec
+            if not partitions_value.startswith("dynamic:"):
+                raise click.ClickException("--partitions must be one of daily|unpartitioned|dynamic:name|none")
         job_partitions = None if partitions_value in {None, "none"} else partitions_value
 
         target = orchestration_path(dbt_project_dir=dbt_project_path, path_=path_)
@@ -223,7 +225,7 @@ def build_meta_group() -> click.Group:
     @click.option("--path", "path_", default="dagsterization.yml", show_default=True)
     @click.option("--models", default="", help="Comma-separated model names")
     @click.option("--tag", "tag_", default="", help="Select models by existing dbt tag")
-    @click.option("--type", "partition_type", required=True, help="daily|unpartitioned")
+    @click.option("--type", "partition_type", required=True, help="daily|unpartitioned|dynamic:name")
     @click.option("--prepare/--no-prepare", default=True, show_default=True)
     @click.option("--parse/--no-parse", default=False, show_default=True)
     def meta_partition(
@@ -235,8 +237,16 @@ def build_meta_group() -> click.Group:
         prepare: bool,
         parse: bool,
     ) -> None:
-        if partition_type not in {"daily", "unpartitioned"}:
-            raise click.ClickException("--type must be one of daily|unpartitioned")
+        # Handle dynamic partition type
+        if partition_type.startswith("dynamic:"):
+            dynamic_name = partition_type.split(":", 1)[1]
+            if not dynamic_name:
+                raise click.ClickException("dynamic partition name must be non-empty (use dynamic:name)")
+            partition_value = partition_type
+        elif partition_type not in {"daily", "unpartitioned"}:
+            raise click.ClickException("--type must be one of daily|unpartitioned|dynamic:name")
+        else:
+            partition_value = partition_type
 
         dbt_project_path = resolve_dir_arg(dbt_project_dir)
         if not dbt_project_path.exists():
@@ -255,7 +265,7 @@ def build_meta_group() -> click.Group:
         target = orchestration_path(dbt_project_dir=dbt_project_path, path_=path_)
         data = load_orch(target)
         for m in selected:
-            orch_set_partition(data=data, model=m, partition=partition_type)
+            orch_set_partition(data=data, model=m, partition=partition_value)
         save_orchestration_with_validation(target=target, data=data, dbt_project_dir=dbt_project_path, prepare=prepare)
         if parse:
             run_dbt_parse(dbt_project_dir=dbt_project_path, dbt_profiles_dir=dbt_project_path, dbt_target=_default_dbt_target())

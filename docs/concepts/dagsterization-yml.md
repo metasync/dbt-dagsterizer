@@ -28,8 +28,10 @@ The file bridges dbt metadata (from `manifest.json`) with Dagster orchestration 
 
 ```yaml
 version: 1                          # Config schema version
-partitions:                         # Partition assignments by model
+partitions:
   daily: []
+  daily_config:
+    include_current_day_partition: false
   dynamic: []
 jobs:                               # Grouped job definitions
   job_name:
@@ -73,7 +75,7 @@ The `partitions` section assigns partitioning strategies to dbt models. Each mod
 | `daily` | One partition per day | `DAGSTER_DAILY_PARTITIONS_START_DATE` (YYYY-MM-DD) | ✅ Separate group |
 | `dynamic` | Custom partition keys (e.g., country codes) | N/A (defined inline) | ✅ Separate group (per name) |
 
-All time-window partition types share: `DAGSTER_PARTITION_TIMEZONE` (e.g., `Asia/Shanghai`)
+Daily partition parameters can be configured in `partitions.daily_config` (see [Daily Partition Configuration](#daily-partition-configuration)). No environment variable override is supported.
 
 ### Daily Partitions
 
@@ -90,12 +92,41 @@ partitions:
 dbt-dagsterizer meta partition --models orders,customers,fact_orders_daily --type daily
 ```
 
+### Daily Partition Configuration
+
+Configure parameters for the `DailyPartitionsDefinition` used by all daily-partitioned models:
+
+```yaml
+partitions:
+  daily:
+    - orders
+    - customers
+  daily_config:
+    include_current_day_partition: true
+```
+
+**Fields**:
+- `include_current_day_partition` (bool, default: `false`): Whether today's partition should be available in the `DailyPartitionsDefinition`.
+  - `false` (default): Only partitions ending *before* the current time are available (equivalent to `end_offset: 0`).
+  - `true`: Today's partition is also available (equivalent to `end_offset: 1`, useful for same-day processing).
+
+> **Note**: This is different from schedule `offset_days`, which controls *which partition* a schedule targets. `include_current_day_partition` controls the *set of available partitions* in the partition definition itself.
+
+**CLI equivalent**:
+```bash
+dbt-dagsterizer meta partition-config --include-current-day-partition
+```
+
 ### Dynamic Partitions
 
 Dynamic partitions allow non-time-based partitioning (e.g., by country, tenant, data source).
 
 ```yaml
 partitions:
+  daily:
+    - orders
+  daily_config:
+    include_current_day_partition: true
   dynamic:
     - name: country_code
       initial_partition_keys: ['US', 'GB', 'DE', 'JP', 'AU']
@@ -421,6 +452,8 @@ partitions:
     - customers
     - fact_orders_daily
     - fact_customer_orders_daily
+  daily_config:
+    include_current_day_partition: true
 
 # Per-model asset jobs (dwd layer)
 asset_jobs:
@@ -530,6 +563,9 @@ dbt-dagsterizer meta init
 
 # Set partitions
 dbt-dagsterizer meta partition --models orders --type daily
+
+# Configure daily partition parameters
+dbt-dagsterizer meta partition-config --include-current-day-partition
 
 # Create asset job
 dbt-dagsterizer meta asset-job --models orders

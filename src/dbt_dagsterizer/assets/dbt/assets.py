@@ -176,7 +176,7 @@ def get_dbt_assets():
     dynamic_partitions_defs = get_dynamic_partitions_defs(dbt_project_dir)
     
     # Get daily partitions definition (required for asset-level partitions)
-    daily_partitions_def = get_daily_partitions_def()
+    daily_partitions_def = get_daily_partitions_def(include_current_day_partition=orch_index.daily_include_current_day_partition)
 
     translator = LubanDagsterDbtTranslator(
         daily_partitions_def=daily_partitions_def,

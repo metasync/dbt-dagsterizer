@@ -30,6 +30,9 @@ from ..orchestration_config import (
     set_asset_job as orch_set_asset_job,
 )
 from ..orchestration_config import (
+    set_daily_config as orch_set_daily_config,
+)
+from ..orchestration_config import (
     set_partition as orch_set_partition,
 )
 from ..orchestration_config import (
@@ -632,5 +635,36 @@ def build_meta_group() -> click.Group:
         if errors:
             raise click.ClickException(f"Validation failed with {len(errors)} error(s)")
         click.echo("OK")
+
+    @meta.command("partition-config")
+    @click.option("--dbt-project-dir", default="./dbt_project", show_default=True)
+    @click.option("--path", "path_", default="dagsterization.yml", show_default=True)
+    @click.option(
+        "--include-current-day-partition/--no-include-current-day-partition",
+        default=None,
+        help="Include today's partition in DailyPartitionsDefinition",
+    )
+    @click.option("--prepare/--no-prepare", default=True, show_default=True)
+    def meta_partition_config(
+        dbt_project_dir: str,
+        path_: str,
+        include_current_day_partition: bool | None,
+        prepare: bool,
+    ) -> None:
+        """Configure daily partition definition parameters."""
+        dbt_project_path = resolve_dir_arg(dbt_project_dir)
+        if not dbt_project_path.exists():
+            raise click.ClickException(f"dbt project dir does not exist: {dbt_project_path}")
+
+        target = orchestration_path(dbt_project_dir=dbt_project_path, path_=path_)
+        data = load_orch(target)
+        orch_set_daily_config(data=data, include_current_day_partition=include_current_day_partition)
+        save_orchestration_with_validation(
+            target=target,
+            data=data,
+            dbt_project_dir=dbt_project_path,
+            prepare=prepare,
+        )
+        click.echo(str(target))
 
     return meta

@@ -47,6 +47,18 @@ def validate_orchestration(
                 if dynamic_name not in idx.dynamic_partitions:
                     issues.append(ValidationIssue("error", f"partitions for model '{model}' references unknown dynamic partition '{dynamic_name}'"))
 
+    # Validate daily_config.include_current_day_partition
+    partitions_data = orchestration.get("partitions")
+    if isinstance(partitions_data, dict):
+        daily_config = partitions_data.get("daily_config")
+        if daily_config is not None:
+            if not isinstance(daily_config, dict):
+                issues.append(ValidationIssue("error", "partitions.daily_config must be a mapping"))
+            else:
+                include_current_day_partition = daily_config.get("include_current_day_partition")
+                if include_current_day_partition is not None and not isinstance(include_current_day_partition, bool):
+                    issues.append(ValidationIssue("error", "partitions.daily_config.include_current_day_partition must be a boolean"))
+
     jobs = orchestration.get("jobs")
     if jobs is not None and not isinstance(jobs, dict):
         issues.append(ValidationIssue("error", "jobs must be a mapping"))
@@ -264,6 +276,16 @@ def validate_orchestration_structure(*, orchestration: dict[str, Any]) -> list[V
                             issues.append(ValidationIssue("error", f"partitions.dynamic[{name}].models contains empty model"))
         elif dynamic_list is not None:
             issues.append(ValidationIssue("error", "partitions.dynamic must be a list"))
+
+        # Validate daily_config
+        daily_config = partitions.get("daily_config")
+        if daily_config is not None:
+            if not isinstance(daily_config, dict):
+                issues.append(ValidationIssue("error", "partitions.daily_config must be a mapping"))
+            else:
+                include_current_day_partition = daily_config.get("include_current_day_partition")
+                if include_current_day_partition is not None and not isinstance(include_current_day_partition, bool):
+                    issues.append(ValidationIssue("error", "partitions.daily_config.include_current_day_partition must be a boolean"))
 
     jobs = orchestration.get("jobs")
     if jobs is not None and not isinstance(jobs, dict):

@@ -115,6 +115,7 @@ class OrchestrationIndex:
     dynamic_partitions: dict[str, DynamicPartitionConfig]  # partition_name -> config
     asset_job_models: set[str]
     group_job_by_model: dict[str, str]
+    daily_include_current_day_partition: bool = False  # DailyPartitionsDefinition end_offset from daily_config (true -> end_offset=1)
 
 
 def index(data: Mapping[str, Any]) -> OrchestrationIndex:
@@ -157,6 +158,17 @@ def index(data: Mapping[str, Any]) -> OrchestrationIndex:
                                 if isinstance(m, str) and m.strip():
                                     partitions_by_model[m.strip()] = partition_spec
 
+    # Parse daily partition config
+    daily_include_current_day_partition = False
+    if isinstance(partitions, Mapping):
+        daily_config = partitions.get("daily_config")
+        if isinstance(daily_config, Mapping):
+            raw_include_current_day_partition = daily_config.get("include_current_day_partition")
+            if raw_include_current_day_partition is not None:
+                if not isinstance(raw_include_current_day_partition, bool):
+                    raise ValueError("partitions.daily_config.include_current_day_partition must be a boolean")
+                daily_include_current_day_partition = raw_include_current_day_partition
+
     asset_job_models: set[str] = set()
     asset_jobs = data.get("asset_jobs")
     if isinstance(asset_jobs, list):
@@ -188,7 +200,28 @@ def index(data: Mapping[str, Any]) -> OrchestrationIndex:
         dynamic_partitions=dynamic_partitions,
         asset_job_models=asset_job_models,
         group_job_by_model=group_job_by_model,
+        daily_include_current_day_partition=daily_include_current_day_partition,
     )
+
+
+def set_daily_config(
+    *,
+    data: MutableMapping[str, Any],
+    include_current_day_partition: bool | None = None,
+) -> None:
+    """Set daily partition configuration.
+
+    Args:
+        data: Orchestration config dict
+        include_current_day_partition: Whether today's partition should be available
+    """
+    partitions = _ensure_mapping(data, "partitions")
+    if include_current_day_partition is not None:
+        daily_config = partitions.get("daily_config")
+        if not isinstance(daily_config, MutableMapping):
+            partitions["daily_config"] = {}
+            daily_config = partitions["daily_config"]
+        daily_config["include_current_day_partition"] = bool(include_current_day_partition)
 
 
 def set_partition(*, data: MutableMapping[str, Any], model: str, partition: str | None) -> None:

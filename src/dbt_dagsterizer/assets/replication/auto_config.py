@@ -71,6 +71,7 @@ def build_auto_replication_specs() -> list[dict]:
             "write_disposition": entry.write_disposition,
             "partition_column": entry.partition_column,
             "partition_type": partition_type,
+            "primary_key": entry.primary_key,
         }
         specs.append(spec)
 

@@ -24,6 +24,7 @@ class ReplicationEntry:
     destination_schema: str
     write_disposition: str
     partition_column: str | None
+    primary_key: str | None = None
 
 
 def _yaml() -> YAML:
@@ -238,6 +239,10 @@ def index(data: Mapping[str, Any]) -> OrchestrationIndex:
                 if not isinstance(model, str) or not model.strip():
                     continue
                 model = model.strip()
+                raw_primary_key = entry.get("primary_key")
+                primary_key: str | None = None
+                if isinstance(raw_primary_key, str) and raw_primary_key.strip():
+                    primary_key = raw_primary_key.strip()
                 replication_entries[model] = ReplicationEntry(
                     model=model,
                     enabled=bool(entry.get("enabled", True)),
@@ -249,6 +254,7 @@ def index(data: Mapping[str, Any]) -> OrchestrationIndex:
                         if isinstance(entry.get("partition_column"), str) and entry.get("partition_column").strip()
                         else None
                     ),
+                    primary_key=primary_key,
                 )
 
     return OrchestrationIndex(
@@ -536,6 +542,7 @@ def set_replication_entry(
     destination_schema: str | None,
     write_disposition: str | None,
     partition_column: str | None,
+    primary_key: str | None = None,
 ) -> None:
     """Add or update a replication entry for a dbt model.
 
@@ -547,6 +554,7 @@ def set_replication_entry(
         destination_schema: Target schema in SQL Server (default: dbo)
         write_disposition: dlt write disposition - "append", "replace", or "merge" (default: replace)
         partition_column: Column to filter by for partition-aware replication (optional)
+        primary_key: Single column name used as the primary key in the destination table (applies to all write dispositions)
     """
     model = model.strip()
     if not model:
@@ -573,6 +581,8 @@ def set_replication_entry(
     entry["write_disposition"] = write_disposition.strip() if write_disposition and write_disposition.strip() else "replace"
     if partition_column and partition_column.strip():
         entry["partition_column"] = partition_column.strip()
+    if primary_key and primary_key.strip():
+        entry["primary_key"] = primary_key.strip()
 
     entries_filtered.append(entry)
     repl["entries"] = entries_filtered

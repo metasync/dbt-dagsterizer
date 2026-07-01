@@ -466,6 +466,7 @@ replication:
       destination_schema: dbo
       write_disposition: replace
       partition_column: order_date
+      primary_key: order_id    # Single column for PK constraint in destination
 ```
 
 **Fields**:
@@ -478,6 +479,7 @@ replication:
 | `destination_schema` | Target schema in SQL Server | `dbo` |
 | `write_disposition` | dlt write disposition: `append`, `replace`, or `merge` | `replace` |
 | `partition_column` | Column to filter by for partition-aware replication | (none) |
+| `primary_key` | Single column name used as the primary key in the destination table (applies to all write dispositions) | (none) |
 
 **Global toggle**:
 
@@ -497,14 +499,44 @@ When `partition_column` is not set on a partitioned model, a **full table copy**
 
 The `write_disposition` field controls how data is loaded into SQL Server:
 
-- **`append`** (default): Appends new data to the existing table without modifying existing rows
+- **`append`**: Appends new data to the existing table without modifying existing rows
 - **`replace`**: Truncates the table before loading, replacing all existing data
-- **`merge`**: Updates existing rows based on a primary key and inserts new rows (requires a merge key to be configured in dlt)
+- **`merge`**: Updates existing rows based on `primary_key` and inserts new rows. You **must** set `primary_key` to a column name that uniquely identifies a row. dlt uses this column to perform an `UPDATE` for matching rows and an `INSERT` for new rows.
+
+> **Note**: When `primary_key` is set, dlt creates a primary key constraint in the destination SQL Server table. This applies to all write dispositions (`append`, `replace`, and `merge`).
 
 **When to use each**:
 - Use `append` for incremental loads where you only add new records
 - Use `replace` for full refreshes or when the source is the complete truth
 - Use `merge` when you need to update existing records (e.g., correcting historical data)
+
+### Merge Replication
+
+When `write_disposition: merge` is set, you must also provide `primary_key` — a single column name that uniquely identifies each row. dlt uses this column as the primary key to decide whether to update an existing row or insert a new one.
+
+```yaml
+replication:
+  enabled: true
+  entries:
+    # Merge with primary key
+    - model: orders
+      enabled: true
+      destination_table: orders
+      destination_schema: dbo
+      write_disposition: merge
+      primary_key: order_id
+      partition_column: order_date
+
+    # Another merge example
+    - model: order_items
+      enabled: true
+      destination_table: order_items
+      destination_schema: dbo
+      write_disposition: merge
+      primary_key: order_item_id
+```
+
+> **Note**: `primary_key` can be used with any write disposition (`append`, `replace`, or `merge`). When set, dlt creates a primary key constraint in the destination SQL Server table.
 
 ### SQL Server Connection
 
@@ -528,6 +560,16 @@ dbt-dagsterizer meta replication entry \
   --destination-table orders \
   --destination-schema dbo \
   --write-disposition replace \
+  --partition-column order_date
+
+# With merge keys
+dbt-dagsterizer meta replication entry \
+  --model orders \
+  --enabled \
+  --destination-table orders \
+  --destination-schema dbo \
+  --write-disposition merge \
+  --merge-keys order_id \
   --partition-column order_date
 ```
 
@@ -620,6 +662,7 @@ replication:
       destination_schema: dbo
       write_disposition: replace
       partition_column: order_date
+      primary_key: order_id
 ```
 
 ```yaml

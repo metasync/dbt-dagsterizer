@@ -18,12 +18,14 @@ def _build_daily_partitioned_schedule(
     partition_lookback_days: int,
     dedupe_across_ticks: bool,
     default_status: dg.DefaultScheduleStatus,
+    execution_timezone: str = "UTC",
 ):
     @dg.schedule(
         name=name,
         cron_schedule=cron_schedule,
         job=job,
         default_status=default_status,
+        execution_timezone=execution_timezone,
     )
     def _schedule(context):
         scheduled_time = context.scheduled_execution_time or datetime.now(timezone.utc)
@@ -56,6 +58,7 @@ def _build_dynamic_partitioned_schedule(
     partition_keys: list[str],
     dedupe_across_ticks: bool,
     default_status: dg.DefaultScheduleStatus,
+    execution_timezone: str = "UTC",
 ):
     """Build a schedule for dynamic partitions.
     
@@ -68,6 +71,7 @@ def _build_dynamic_partitioned_schedule(
         partition_keys: List of partition keys to emit RunRequests for
         dedupe_across_ticks: Whether to dedupe run keys across ticks
         default_status: Initial schedule status
+        execution_timezone: IANA timezone name for schedule execution
     
     Returns:
         A schedule definition function
@@ -77,6 +81,7 @@ def _build_dynamic_partitioned_schedule(
         cron_schedule=cron_schedule,
         job=job,
         default_status=default_status,
+        execution_timezone=execution_timezone,
     )
     def _schedule(context):
         scheduled_time = context.scheduled_execution_time or datetime.now(timezone.utc)
@@ -137,6 +142,7 @@ def build_dbt_schedules(
 
             partition_offset_days = int(spec.get("partition_offset_days", 0))
             partition_lookback_days = int(spec.get("partition_lookback_days", 0))
+            execution_timezone = str(spec.get("timezone", "UTC") or "UTC").strip() or "UTC"
             schedules_by_name[spec["name"]] = _build_daily_partitioned_schedule(
                 name=spec["name"],
                 cron_schedule=spec["cron_schedule"],
@@ -145,6 +151,7 @@ def build_dbt_schedules(
                 partition_lookback_days=partition_lookback_days,
                 dedupe_across_ticks=dedupe_across_ticks,
                 default_status=default_status,
+                execution_timezone=execution_timezone,
             )
             continue
 

@@ -28,6 +28,8 @@ def build_auto_dbt_schedule_specs() -> list[dict]:
     cfg = load_orch(cfg_path)
     idx = index_orch(cfg)
 
+    global_timezone = str(cfg.get("timezone", "UTC") or "UTC").strip() or "UTC"
+
     specs: list[dict] = []
     schedules = cfg.get("schedules")
     if isinstance(schedules, dict):
@@ -56,6 +58,7 @@ def build_auto_dbt_schedule_specs() -> list[dict]:
                         lookback_days=lookback_days,
                         offset_days=offset_days,
                         enabled=enabled,
+                        timezone=global_timezone,
                     )
                 )
                 continue

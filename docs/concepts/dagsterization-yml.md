@@ -29,6 +29,7 @@ The file bridges dbt metadata (from `manifest.json`) with Dagster orchestration 
 
 ```yaml
 version: 1                          # Config schema version
+timezone: UTC                       # Global schedule execution timezone
 partitions:
   daily: []
   daily_config:
@@ -57,6 +58,36 @@ replication:                        # Optional: StarRocks -> SQL Server replicat
   enabled: false
   entries: []
 ```
+
+---
+
+## Timezone
+
+The top-level `timezone` field sets the execution timezone for **all** schedules declared in the file.
+
+```yaml
+version: 1
+timezone: Asia/Macau
+
+schedules:
+  orders_daily_schedule:
+    type: daily_at
+    job_name: dbt_orders_asset_job
+    hour: 2
+    minute: 0
+```
+
+**Fields**:
+- `timezone` (string, default: `UTC`): IANA timezone name used as `execution_timezone` for every schedule.
+  - Examples: `UTC`, `America/New_York`, `Europe/Berlin`, `Asia/Hong_Kong`, `Asia/Macau`
+  - When omitted, all schedules default to UTC.
+
+**CLI equivalent**:
+```bash
+dbt-dagsterizer meta timezone --timezone "Asia/Shanghai"
+```
+
+> **Note**: This is a global setting. All schedules in the file share the same execution timezone. The `hour` and `minute` values in each schedule are interpreted in this timezone.
 
 ---
 
@@ -581,6 +612,7 @@ Here's a realistic `dagsterization.yml` for a multi-layer dbt project:
 
 ```yaml
 version: 1
+timezone: Asia/Macau
 
 # Partition assignments
 partitions:
@@ -715,6 +747,9 @@ dbt-dagsterizer meta partition --models orders --type daily
 
 # Configure daily partition parameters
 dbt-dagsterizer meta partition-config --include-current-day-partition
+
+# Set global schedule timezone
+dbt-dagsterizer meta timezone --timezone "Asia/Macau"
 
 # Create asset job
 dbt-dagsterizer meta asset-job --models orders

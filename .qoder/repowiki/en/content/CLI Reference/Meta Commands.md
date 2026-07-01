@@ -17,6 +17,13 @@
 - [test_cli_schema_yml_update.py](file://tests/test_cli_schema_yml_update.py)
 </cite>
 
+## Update Summary
+**Changes Made**
+- Added documentation for the new `meta partition-config` command
+- Updated the orchestration schema documentation to include daily_config section
+- Added examples and usage instructions for daily partition configuration
+- Updated command reference section with new partition-config command
+
 ## Table of Contents
 1. [Introduction](#introduction)
 2. [Project Structure](#project-structure)
@@ -34,6 +41,7 @@ This document explains the meta-related CLI commands in dbt-dagsterizer. These c
 - Initializing and validating orchestration configuration
 - Creating and updating grouped jobs, asset jobs, schedules, and partitioning
 - Managing partition-change detectors and propagators
+- Configuring daily partition settings with current day partition control
 - Integrating with dbt manifest parsing and validation
 
 The documentation covers command usage, parameters, output formats, and practical examples for project maintenance and metadata refresh operations.
@@ -59,7 +67,7 @@ MACROS --> TEMPLATES["embedded templates<br/>project_templates/*"]
 
 **Diagram sources**
 - [app.py:19-28](file://src/dbt_dagsterizer/cli_parts/app.py#L19-L28)
-- [meta.py:56-626](file://src/dbt_dagsterizer/cli_parts/meta.py#L56-L626)
+- [meta.py:56-701](file://src/dbt_dagsterizer/cli_parts/meta.py#L56-L701)
 - [macros.py:67-83](file://src/dbt_dagsterizer/cli_parts/macros.py#L67-L83)
 - [validation.py:22-310](file://src/dbt_dagsterizer/cli_parts/validation.py#L22-L310)
 - [orchestration_config.py:23-370](file://src/dbt_dagsterizer/orchestration_config.py#L23-L370)
@@ -82,7 +90,7 @@ Key outputs:
 - Optional dbt parse invocation updates target/manifest.json to reflect recent changes.
 
 **Section sources**
-- [meta.py:56-626](file://src/dbt_dagsterizer/cli_parts/meta.py#L56-L626)
+- [meta.py:56-701](file://src/dbt_dagsterizer/cli_parts/meta.py#L56-L701)
 - [orchestration_config.py:23-83](file://src/dbt_dagsterizer/orchestration_config.py#L23-L83)
 - [validation.py:22-310](file://src/dbt_dagsterizer/cli_parts/validation.py#L22-L310)
 - [manifest_prepare.py:30-72](file://src/dbt_dagsterizer/dbt/manifest_prepare.py#L30-L72)
@@ -197,6 +205,13 @@ The meta group provides commands to initialize, update, and validate orchestrati
     - --parse: run dbt parse after writing
   - Behavior: Derives job name (asset job or existing job) and creates daily_at schedule.
 
+- meta partition-config
+  - Purpose: Configure daily partition definition parameters.
+  - Options:
+    - --include-current-day-partition/--no-include-current-day-partition: control whether today's partition is included in DailyPartitionsDefinition
+    - --prepare: prepare manifest
+  - Behavior: Sets partitions.daily_config.include_current_day_partition in the orchestration file.
+
 - meta partition-change detector
   - Purpose: Configure a partition-change detector for a model.
   - Options:
@@ -253,13 +268,13 @@ RunParse --> Done
 - [manifest_prepare.py:64-72](file://src/dbt_dagsterizer/dbt/manifest_prepare.py#L64-L72)
 
 **Section sources**
-- [meta.py:61-626](file://src/dbt_dagsterizer/cli_parts/meta.py#L61-L626)
+- [meta.py:61-701](file://src/dbt_dagsterizer/cli_parts/meta.py#L61-L701)
 - [validation.py:22-310](file://src/dbt_dagsterizer/cli_parts/validation.py#L22-L310)
 - [orchestration_config.py:112-370](file://src/dbt_dagsterizer/orchestration_config.py#L112-L370)
 - [manifest_prepare.py:30-72](file://src/dbt_dagsterizer/dbt/manifest_prepare.py#L30-L72)
 
 ### Macros Group: Template Synchronization
-The macros group synchronizes managed macro templates into a dbt project’s macros directory.
+The macros group synchronizes managed macro templates into a dbt project's macros directory.
 
 - macros sync
   - Purpose: Sync macro templates into dbt_project/macros/dbt_dagsterizer/.
@@ -284,6 +299,8 @@ Key schema elements:
 - jobs: mapping of job_name -> {models: list, include_upstream: bool, partitions?: daily|unpartitioned}
 - asset_jobs: list of model names
 - partitions: mapping of daily|unpartitioned -> list of model names
+- partitions.daily_config: configuration for daily partitions
+  - include_current_day_partition: boolean controlling whether today's partition is included
 - schedules: mapping of schedule_name -> {type: daily_at, job_name, hour, minute, lookback_days, offset_days, enabled}
 - partition_change: {detectors: list, propagators: list}
 
@@ -306,6 +323,7 @@ Validation ensures:
 - Types and constraints are respected (e.g., partitions must be daily|unpartitioned, schedules must be daily_at).
 - Schedules reference valid job names (derived or explicit).
 - Partition-change detectors and propagators meet required constraints.
+- Daily partition configuration values are valid booleans.
 
 Structure validation:
 - Ensures top-level mappings/lists are present and typed correctly.
@@ -363,8 +381,6 @@ CLI["cli.py"] --> APP
 - Batch operations: Prefer specifying models via --models when possible to limit validation scope.
 - Force vs. incremental updates: Use --force cautiously; prefer targeted updates to reduce unnecessary writes.
 
-[No sources needed since this section provides general guidance]
-
 ## Troubleshooting Guide
 Common issues and resolutions:
 - Manifest not found or stale:
@@ -378,6 +394,9 @@ Common issues and resolutions:
 - Partition-change constraints:
   - Ensure exactly one of --detect-relation or --detect-source is set.
   - Verify partition-date and updated-at expressions are non-empty.
+- Daily partition configuration:
+  - The include_current_day_partition setting controls whether today's partition is included in DailyPartitionsDefinition.
+  - Must be a boolean value (true/false).
 
 **Section sources**
 - [meta.py:113-114](file://src/dbt_dagsterizer/cli_parts/meta.py#L113-L114)
@@ -386,9 +405,7 @@ Common issues and resolutions:
 - [meta.py:594-597](file://src/dbt_dagsterizer/cli_parts/meta.py#L594-L597)
 
 ## Conclusion
-The meta commands provide a robust, manifest-aware workflow for maintaining orchestration intent in dbt-dagsterizer projects. They support initialization, updates, and validation of jobs, asset jobs, schedules, partitions, and partition-change detectors/propagators. Combined with macros synchronization and project scaffolding, they streamline project maintenance and metadata refresh operations.
-
-[No sources needed since this section summarizes without analyzing specific files]
+The meta commands provide a robust, manifest-aware workflow for maintaining orchestration intent in dbt-dagsterizer projects. They support initialization, updates, and validation of jobs, asset jobs, schedules, partitions, partition-change detectors/propagators, and daily partition configuration. Combined with macros synchronization and project scaffolding, they streamline project maintenance and metadata refresh operations.
 
 ## Appendices
 
@@ -419,6 +436,12 @@ The meta commands provide a robust, manifest-aware workflow for maintaining orch
   - Set daily partitioning for models:
     - dbt-dagsterizer meta partition --models fact_orders_daily,fact_customer_orders_daily --type daily
 
+- Daily partition configuration
+  - Include today's partition in DailyPartitionsDefinition:
+    - dbt-dagsterizer meta partition-config --include-current-day-partition
+  - Exclude today's partition from DailyPartitionsDefinition:
+    - dbt-dagsterizer meta partition-config --no-include-current-day-partition
+
 - Partition-change detectors and propagators
   - Add detector using source:
     - dbt-dagsterizer meta partition-change detector --model orders --enabled --detect-source ods.orders --partition-date-expr order_date --updated-at-expr updated_at --lookback-days 7 --offset-days 1
@@ -436,6 +459,6 @@ Integration tips:
 - Combine meta validate --prepare in CI to catch configuration errors early.
 
 **Section sources**
-- [cli.md:119-310](file://docs/concepts/cli.md#L119-L310)
-- [test_cli_meta_generation.py:17-196](file://tests/test_cli_meta_generation.py#L17-L196)
+- [cli.md:119-311](file://docs/concepts/cli.md#L119-L311)
+- [test_cli_meta_generation.py:17-261](file://tests/test_cli_meta_generation.py#L17-L261)
 - [test_cli_schema_yml_update.py:17-48](file://tests/test_cli_schema_yml_update.py#L17-L48)

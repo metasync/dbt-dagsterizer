@@ -44,6 +44,7 @@ def load_or_create(path: Path) -> MutableMapping[str, Any]:
     if not path.exists():
         return {
             "version": 1,
+            "timezone": "UTC",
             "jobs": {},
             "asset_jobs": [],
             "partitions": {},
@@ -57,6 +58,7 @@ def load_or_create(path: Path) -> MutableMapping[str, Any]:
     if data is None:
         return {
             "version": 1,
+            "timezone": "UTC",
             "jobs": {},
             "asset_jobs": [],
             "partitions": {},
@@ -69,6 +71,8 @@ def load_or_create(path: Path) -> MutableMapping[str, Any]:
 
     if "version" not in data:
         data["version"] = 1
+    if "timezone" not in data:
+        data["timezone"] = "UTC"
     if "jobs" not in data:
         data["jobs"] = {}
     if "asset_jobs" not in data:
@@ -142,6 +146,7 @@ class OrchestrationIndex:
     asset_job_models: set[str]
     group_job_by_model: dict[str, str]
     daily_include_current_day_partition: bool = False  # DailyPartitionsDefinition end_offset from daily_config (true -> end_offset=1)
+    timezone: str = "UTC"  # Global schedule execution timezone
     replication_enabled: bool = False
     replication_entries: dict[str, ReplicationEntry] = field(default_factory=dict)  # model_name -> config
 
@@ -223,6 +228,14 @@ def index(data: Mapping[str, Any]) -> OrchestrationIndex:
                     raise ValueError(f"Model '{name}' appears in multiple jobs: '{group_job_by_model[name]}' and '{job_name}'")
                 group_job_by_model[name] = job_name
 
+    # Parse global timezone
+    timezone = "UTC"
+    raw_timezone = data.get("timezone")
+    if raw_timezone is not None:
+        if not isinstance(raw_timezone, str) or not raw_timezone.strip():
+            raise ValueError("timezone must be a non-empty string")
+        timezone = raw_timezone.strip()
+
     replication_enabled = False
     replication_entries: dict[str, ReplicationEntry] = {}
     repl = data.get("replication")
@@ -263,9 +276,23 @@ def index(data: Mapping[str, Any]) -> OrchestrationIndex:
         asset_job_models=asset_job_models,
         group_job_by_model=group_job_by_model,
         daily_include_current_day_partition=daily_include_current_day_partition,
+        timezone=timezone,
         replication_enabled=replication_enabled,
         replication_entries=replication_entries,
     )
+
+
+def set_timezone(*, data: MutableMapping[str, Any], timezone: str) -> None:
+    """Set the global schedule execution timezone.
+
+    Args:
+        data: Orchestration config dict
+        timezone: IANA timezone name (e.g. 'UTC', 'Asia/Shanghai')
+    """
+    timezone = timezone.strip()
+    if not timezone:
+        raise ValueError("timezone must be a non-empty string")
+    data["timezone"] = timezone
 
 
 def set_daily_config(

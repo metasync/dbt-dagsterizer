@@ -12,9 +12,20 @@
 - [schedules/__init__.py](file://src/dbt_dagsterizer/schedules/__init__.py)
 - [sensors/__init__.py](file://src/dbt_dagsterizer/sensors/__init__.py)
 - [resources/__init__.py](file://src/dbt_dagsterizer/resources/__init__.py)
+- [assets/dbt/vars.py](file://src/dbt_dagsterizer/assets/dbt/vars.py)
+- [assets/dbt/assets.py](file://src/dbt_dagsterizer/assets/dbt/assets.py)
+- [jobs/dbt/factory.py](file://src/dbt_dagsterizer/jobs/dbt/factory.py)
 - [test_api.py](file://tests/test_api.py)
+- [test_dbt_vars.py](file://tests/test_dbt_vars.py)
 - [dagsterization.yml](file://src/dbt_dagsterizer/project_templates/luban-dagster-dbt-starrocks-code-location-source-template/{{cookiecutter.output_name}}/dbt_project/dagsterization.yml)
 </cite>
+
+## Update Summary
+**Changes Made**
+- Enhanced partition variable handling documentation for improved `_get_dbt_vars_for_context` function
+- Added detailed coverage of time window support and exception handling for different partition types
+- Updated asset and job integration sections to reflect better partition variable propagation
+- Added comprehensive examples for dynamic partition handling and fallback mechanisms
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -22,17 +33,18 @@
 3. [Core Components](#core-components)
 4. [Architecture Overview](#architecture-overview)
 5. [Detailed Component Analysis](#detailed-component-analysis)
-6. [Dependency Analysis](#dependency-analysis)
-7. [Performance Considerations](#performance-considerations)
-8. [Troubleshooting Guide](#troubleshooting-guide)
-9. [Conclusion](#conclusion)
-10. [Appendices](#appendices)
+6. [Enhanced Partition Variable Handling](#enhanced-partition-variable-handling)
+7. [Dependency Analysis](#dependency-analysis)
+8. [Performance Considerations](#performance-considerations)
+9. [Troubleshooting Guide](#troubleshooting-guide)
+10. [Conclusion](#conclusion)
+11. [Appendices](#appendices)
 
 ## Introduction
-This document provides a comprehensive API reference for dbt-dagsterizer’s Python interface, focusing on the primary entry point for building Dagster Definitions from a dbt project. It documents the build_definitions() function, its parameters, return values, environment variable handling, configuration options, and advanced usage patterns for assets, jobs, schedules, sensors, and resources. Practical examples demonstrate programmatic integration with Dagster code locations and guidance for production usage and performance.
+This document provides a comprehensive API reference for dbt-dagsterizer's Python interface, focusing on the primary entry point for building Dagster Definitions from a dbt project. It documents the build_definitions() function, its parameters, return values, environment variable handling, configuration options, and advanced usage patterns for assets, jobs, schedules, sensors, and resources. The documentation now includes enhanced coverage of partition variable handling capabilities, particularly the improved `_get_dbt_vars_for_context` function with better time window support and dynamic partition handling.
 
 ## Project Structure
-The API surface centers around a single function that orchestrates asset, job, schedule, sensor, and resource discovery from a dbt project. Supporting modules handle environment variable management, orchestration configuration persistence, manifest inputs caching, and partition definitions.
+The API surface centers around a single function that orchestrates asset, job, schedule, sensor, and resource discovery from a dbt project. Supporting modules handle environment variable management, orchestration configuration persistence, manifest inputs caching, and partition definitions. The enhanced partition variable handling is integrated throughout the asset and job creation processes.
 
 ```mermaid
 graph TB
@@ -45,8 +57,10 @@ API --> RES["resources/__init__.py<br/>get_resources()"]
 ASSETS --> DBT_ASSETS["assets/dbt/assets.py<br/>get_dbt_assets()"]
 ASSETS --> SRC_FACTORY["assets/sources/factory.py<br/>build_observable_source_assets()"]
 ASSETS --> SRC_AUTO["assets/sources/automation.py<br/>load_automation_observable_sources()"]
+ASSETS --> VARS["assets/dbt/vars.py<br/>_get_dbt_vars_for_context()"]
 JOBS --> DBT_JOBS["jobs/dbt/jobs.py<br/>get_dbt_jobs()"]
 JOBS --> OBS_JOBS["jobs/sources/jobs.py<br/>get_observe_sources_job()"]
+JOBS --> JOB_FACTORY["jobs/dbt/factory.py<br/>_build_dbt_cli_job()"]
 SCHEDULES --> DBT_SCH["schedules/dbt/schedules.py<br/>get_dbt_schedules()"]
 SCHEDULES --> OBS_SCH["schedules/sources/schedules.py<br/>get_observe_sources_schedule()"]
 SENSORS --> DBT_CFG["sensors/dbt_config.py<br/>PARTITION_CHANGE_*"]
@@ -57,6 +71,9 @@ RES --> SR_RES["resources/starrocks.py<br/>make_starrocks_resource()"]
 API --> ORCH["orchestration_config.py<br/>dagsterization.yml loader & writer"]
 API --> MAN["manifest_inputs.py<br/>.luban_manifest_inputs.json"]
 API --> PART["partitions.py<br/>DailyPartitionsDefinition"]
+VARS --> TIME_WIN["Time Window Processing"]
+VARS --> DYNAMIC_PART["Dynamic Partition Handling"]
+VARS --> FALLBACK["Default Daily Window"]
 ```
 
 **Diagram sources**
@@ -67,6 +84,9 @@ API --> PART["partitions.py<br/>DailyPartitionsDefinition"]
 - [schedules/__init__.py:1-10](file://src/dbt_dagsterizer/schedules/__init__.py#L1-L10)
 - [sensors/__init__.py:40-75](file://src/dbt_dagsterizer/sensors/__init__.py#L40-L75)
 - [resources/__init__.py:5-10](file://src/dbt_dagsterizer/resources/__init__.py#L5-L10)
+- [assets/dbt/vars.py:25-61](file://src/dbt_dagsterizer/assets/dbt/vars.py#L25-L61)
+- [assets/dbt/assets.py:197-201](file://src/dbt_dagsterizer/assets/dbt/assets.py#L197-L201)
+- [jobs/dbt/factory.py:62-67](file://src/dbt_dagsterizer/jobs/dbt/factory.py#L62-L67)
 - [orchestration_config.py:19-83](file://src/dbt_dagsterizer/orchestration_config.py#L19-L83)
 - [manifest_inputs.py:24-91](file://src/dbt_dagsterizer/manifest_inputs.py#L24-L91)
 - [partitions.py:10-21](file://src/dbt_dagsterizer/partitions.py#L10-L21)
@@ -79,25 +99,29 @@ API --> PART["partitions.py<br/>DailyPartitionsDefinition"]
 - [schedules/__init__.py:1-10](file://src/dbt_dagsterizer/schedules/__init__.py#L1-L10)
 - [sensors/__init__.py:40-75](file://src/dbt_dagsterizer/sensors/__init__.py#L40-L75)
 - [resources/__init__.py:5-10](file://src/dbt_dagsterizer/resources/__init__.py#L5-L10)
+- [assets/dbt/vars.py:25-61](file://src/dbt_dagsterizer/assets/dbt/vars.py#L25-L61)
+- [assets/dbt/assets.py:197-201](file://src/dbt_dagsterizer/assets/dbt/assets.py#L197-L201)
+- [jobs/dbt/factory.py:62-67](file://src/dbt_dagsterizer/jobs/dbt/factory.py#L62-L67)
 - [orchestration_config.py:19-83](file://src/dbt_dagsterizer/orchestration_config.py#L19-L83)
 - [manifest_inputs.py:24-91](file://src/dbt_dagsterizer/manifest_inputs.py#L24-L91)
 - [partitions.py:10-21](file://src/dbt_dagsterizer/partitions.py#L10-L21)
 
 ## Core Components
-This section documents the main build_definitions() function and its surrounding ecosystem.
+This section documents the main build_definitions() function and its surrounding ecosystem, including the enhanced partition variable handling capabilities.
 
 - Function: build_definitions
   - Purpose: Construct a Dagster Definitions object from a dbt project by dynamically loading assets, jobs, schedules, sensors, and resources.
   - Parameters:
     - dbt_project_dir: Optional[str | Path]. Absolute or relative path to the dbt project root. Defaults to "./dbt_project" if not provided. Relative paths are resolved against the current working directory.
-    - dbt_profiles_dir: Optional[str | Path]. Absolute or relative path to the dbt profiles directory. If omitted, the environment’s DBT_PROFILES_DIR is used.
+    - dbt_profiles_dir: Optional[str | Path]. Absolute or relative path to the dbt profiles directory. If omitted, the environment's DBT_PROFILES_DIR is used.
     - default_dbt_target: Optional[str]. Default dbt target name to set via LUBAN_DEFAULT_DBT_TARGET during definition construction.
   - Returns: dagster.Definitions containing assets, jobs, schedules, sensors, and resources.
   - Behavior:
     - Resolves dbt_project_dir and dbt_profiles_dir to absolute paths.
     - Temporarily sets environment variables (DBT_PROJECT_DIR, DBT_PROFILES_DIR, LUBAN_DEFAULT_DBT_TARGET) while constructing definitions.
-    - If no dbt SQL models are found under the dbt project’s models directory, a minimal “project_ready” asset is returned along with configured resources.
+    - If no dbt SQL models are found under the dbt project's models directory, a minimal "project_ready" asset is returned along with configured resources.
     - Otherwise, aggregates assets, jobs, schedules, sensors, and resources from their respective modules.
+    - Enhanced partition variable handling is automatically integrated into asset and job creation processes.
   - Type hints and defaults:
     - All parameters accept str or Path and default to None when not provided.
   - Environment variable handling:
@@ -106,22 +130,26 @@ This section documents the main build_definitions() function and its surrounding
   - Configuration options:
     - Orchestrates via dagsterization.yml (see Orchestration Configuration).
     - Daily partitions require DAGSTER_DAILY_PARTITIONS_START_DATE.
+    - Enhanced partition variable support for time-window and dynamic partitions.
   - Error conditions:
     - Missing DAGSTER_DAILY_PARTITIONS_START_DATE when daily partitions are used.
     - Invalid orchestration configuration entries raise explicit errors during parsing and mutation operations.
+    - Improved exception handling for partition context access.
 
 Practical usage pattern:
 - Call build_definitions() with dbt_project_dir pointing to a valid dbt project with dbt_project.yml, profiles.yml, and models/*.sql.
 - Integrate the returned Definitions into a Dagster code location by assigning it to a module-level variable named defs.
+- Enhanced partition variables are automatically propagated to dbt models based on the execution context.
 
 **Section sources**
 - [api.py:15-72](file://src/dbt_dagsterizer/api.py#L15-L72)
 - [env_utils.py:61-77](file://src/dbt_dagsterizer/env_utils.py#L61-L77)
 - [partitions.py:10-21](file://src/dbt_dagsterizer/partitions.py#L10-L21)
 - [orchestration_config.py:19-83](file://src/dbt_dagsterizer/orchestration_config.py#L19-L83)
+- [assets/dbt/vars.py:25-61](file://src/dbt_dagsterizer/assets/dbt/vars.py#L25-L61)
 
 ## Architecture Overview
-The build_definitions() function orchestrates a modular pipeline that discovers and composes Dagster constructs from a dbt project. It manages environment variables, checks for dbt models, and delegates to specialized modules for assets, jobs, schedules, sensors, and resources.
+The build_definitions() function orchestrates a modular pipeline that discovers and composes Dagster constructs from a dbt project. It manages environment variables, checks for dbt models, and delegates to specialized modules for assets, jobs, schedules, sensors, and resources. The enhanced partition variable handling is seamlessly integrated throughout the asset and job creation processes.
 
 ```mermaid
 sequenceDiagram
@@ -134,6 +162,7 @@ participant Jobs as "jobs.get_jobs()"
 participant Schedules as "schedules.get_schedules()"
 participant Sensors as "sensors.get_sensors()"
 participant Resources as "resources.get_resources()"
+participant Vars as "_get_dbt_vars_for_context()"
 participant Dagster as "Definitions"
 Caller->>API : "Call with dbt_project_dir, dbt_profiles_dir, default_dbt_target"
 API->>FS : "Resolve paths and check for models"
@@ -142,7 +171,11 @@ alt "No dbt models"
 API-->>Dagster : "Return Definitions with project_ready asset and resources"
 else "Has dbt models"
 API->>Assets : "Load dbt assets and observable sources"
+Assets->>Vars : "Get partition variables for context"
+Vars-->>Assets : "Return {min_date, max_date, min_datetime, max_datetime}"
 API->>Jobs : "Load dbt jobs and observe-sources job"
+Jobs->>Vars : "Get partition variables for context"
+Vars-->>Jobs : "Return partition variables or fallback"
 API->>Schedules : "Load dbt schedules and observe-sources schedule"
 API->>Sensors : "Build partition change sensors and automation sensor"
 API->>Resources : "Provide dbt and starrocks resources"
@@ -159,6 +192,7 @@ Env-->>API : "Restore environment"
 - [schedules/__init__.py:1-10](file://src/dbt_dagsterizer/schedules/__init__.py#L1-L10)
 - [sensors/__init__.py:40-75](file://src/dbt_dagsterizer/sensors/__init__.py#L40-L75)
 - [resources/__init__.py:5-10](file://src/dbt_dagsterizer/resources/__init__.py#L5-L10)
+- [assets/dbt/vars.py:25-61](file://src/dbt_dagsterizer/assets/dbt/vars.py#L25-L61)
 
 ## Detailed Component Analysis
 
@@ -171,9 +205,11 @@ Env-->>API : "Restore environment"
 - Behavior:
   - Path resolution and environment preparation handled via env_utils.temporary_env().
   - Skeleton mode when no dbt models are present; otherwise loads dynamic constructs from submodules.
+  - Enhanced partition variable handling is automatically integrated into asset and job creation.
 - Usage patterns:
   - Programmatic integration: Assign the returned Definitions to a module-level variable named defs in your Dagster code location.
   - CLI vs API: The CLI internally calls build_definitions(); for programmatic control, call it directly.
+  - Automatic partition variable propagation to dbt models based on execution context.
 
 **Section sources**
 - [api.py:15-72](file://src/dbt_dagsterizer/api.py#L15-L72)
@@ -185,7 +221,7 @@ Env-->>API : "Restore environment"
   - DBT_PROFILES_DIR: Set to the resolved profiles directory.
   - LUBAN_DEFAULT_DBT_TARGET: Set to the provided default target.
 - Dotenv loading:
-  - Searches for .env files in the dbt project’s parent and itself.
+  - Searches for .env files in the dbt project's parent and itself.
   - Only applies keys not already present in the current environment.
 - Partition definitions:
   - Requires DAGSTER_DAILY_PARTITIONS_START_DATE for daily partitions.
@@ -225,8 +261,10 @@ Env-->>API : "Restore environment"
 ### Assets, Jobs, Schedules, Sensors, Resources
 - Assets:
   - Aggregates dbt assets and observable source assets built from automation and factory modules.
+  - Enhanced partition variable handling automatically injects time window variables into dbt models.
 - Jobs:
   - Aggregates dbt jobs and an optional observe-sources job.
+  - Improved partition variable support for both time-window and dynamic partitions.
 - Schedules:
   - Aggregates dbt schedules and an optional observe-sources schedule.
 - Sensors:
@@ -245,8 +283,9 @@ Env-->>API : "Restore environment"
 ### Advanced Usage Patterns
 
 #### Custom Asset Generation
-- Extend assets via the assets module’s factories and automation loaders.
+- Extend assets via the assets module's factories and automation loaders.
 - Combine dbt assets with observable sources to react to external data changes.
+- Enhanced partition variable support automatically handles time-window and dynamic partition contexts.
 
 **Section sources**
 - [assets/__init__.py:1-13](file://src/dbt_dagsterizer/assets/__init__.py#L1-L13)
@@ -254,6 +293,7 @@ Env-->>API : "Restore environment"
 #### Job Orchestration
 - Define jobs in dagsterization.yml with models, include_upstream, and partitions.
 - Use set_group_job and delete_group_job to manage job configurations programmatically.
+- Improved partition variable handling ensures proper time window propagation to dbt jobs.
 
 **Section sources**
 - [orchestration_config.py:196-235](file://src/dbt_dagsterizer/orchestration_config.py#L196-L235)
@@ -262,6 +302,7 @@ Env-->>API : "Restore environment"
 #### Sensor Configuration
 - Configure partition-change detectors and propagators in dagsterization.yml or programmatically via set_partition_change_detector and set_partition_change_propagation.
 - Control propagation behavior with LUBAN_PARTITION_CHANGE_PROPAGATOR_MODE.
+- Enhanced partition variable handling improves sensor accuracy for time-window and dynamic partitions.
 
 **Section sources**
 - [sensors/__init__.py:40-75](file://src/dbt_dagsterizer/sensors/__init__.py#L40-L75)
@@ -272,6 +313,7 @@ Env-->>API : "Restore environment"
 - Local development: Use temporary_env to set DBT_PROJECT_DIR and DBT_PROFILES_DIR for isolated runs.
 - CI/CD: Persist dagsterization.yml and .env files alongside the dbt project; ensure DAGSTER_DAILY_PARTITIONS_START_DATE is set in the environment.
 - Kubernetes/Docker: Mount dbt project directories and pass environment variables accordingly.
+- Enhanced partition variable support works seamlessly across all execution environments.
 
 **Section sources**
 - [env_utils.py:61-77](file://src/dbt_dagsterizer/env_utils.py#L61-L77)
@@ -284,12 +326,119 @@ Env-->>API : "Restore environment"
 - Full integration:
   - Populate models/*.sql and dagsterization.yml.
   - Call build_definitions(...) and assign the result to a module-level defs variable for use in a Dagster code location.
+- Enhanced partition variable usage:
+  - Time-window partitions automatically receive min_date, max_date, min_datetime, max_datetime variables.
+  - Dynamic partitions receive partition_key variable.
+  - Non-partitioned runs fall back to default daily window variables.
 
 **Section sources**
 - [test_api.py:6-21](file://tests/test_api.py#L6-L21)
 
+## Enhanced Partition Variable Handling
+
+### Overview
+The enhanced partition variable handling system provides sophisticated support for different partition types through the `_get_dbt_vars_for_context()` function. This system automatically detects the execution context and generates appropriate dbt variables for model execution.
+
+### Supported Partition Types
+
+#### Time-Window Partitions (Daily, Hourly, Monthly)
+- **Context Detection**: Automatically detects time-window partitions via `context.partition_time_window`
+- **Variable Generation**: Produces four variables for each execution:
+  - `min_date`: Start date in YYYY-MM-DD format
+  - `max_date`: End date in YYYY-MM-DD format  
+  - `min_datetime`: Start datetime in YYYY-MM-DD HH:MM:SS format
+  - `max_datetime`: End datetime in YYYY-MM-DD HH:MM:SS format
+- **Exception Safety**: Gracefully handles cases where partition_time_window is not available
+
+#### Dynamic Partitions
+- **Context Detection**: Identifies dynamic partitions via `context.partition_key`
+- **Variable Generation**: Returns dictionary with `partition_key` set to the current partition value
+- **Exception Safety**: Safely handles missing partition_key with fallback mechanism
+
+#### Fallback Mode (Non-Partitioned Runs)
+- **Default Window**: Generates variables for the current day when no partition context is available
+- **Format Consistency**: Maintains the same variable format as time-window partitions
+- **Manual Execution**: Essential for ad-hoc runs against daily-partitioned assets
+
+### Implementation Details
+
+#### Exception Handling Strategy
+The system uses careful exception handling to accommodate different Dagster execution contexts:
+
+```python
+# Time-window detection with exception safety
+try:
+    time_window = context.partition_time_window
+except Exception:
+    time_window = None
+
+# Dynamic partition detection with exception safety  
+try:
+    partition_key = context.partition_key
+except Exception:
+    partition_key = None
+```
+
+#### Variable Generation Functions
+- `_dbt_partition_vars_from_time_window()`: Converts datetime window to formatted variables
+- `_default_daily_window_vars()`: Creates fallback variables for non-partitioned runs
+- `_get_dbt_vars_for_context()`: Main entry point coordinating all detection logic
+
+### Integration Points
+
+#### Asset Pipeline Integration
+The partition variables are automatically injected into dbt asset execution:
+
+```python
+# In assets/dbt/assets.py
+@dbt_assets(...)
+def _dbt_assets(context, dbt: DbtCliResource):
+    # Enhanced variable handling
+    dbt_vars = _get_dbt_vars_for_context(context)
+    dbt_args = ["build"]
+    if dbt_vars:
+        dbt_args += ["--vars", json.dumps(dbt_vars)]
+    # Execute dbt with partition variables
+```
+
+#### Job Pipeline Integration  
+The same variable handling is applied to dbt jobs:
+
+```python
+# In jobs/dbt/factory.py  
+@dg.op(name=op_name, required_resource_keys={"dbt"})
+def _run(context):
+    partition_vars = _get_dbt_vars_for_context(context) or {}
+    combined_vars = {**partition_vars, **vars_dict}
+    # Execute dbt job with partition variables
+```
+
+### Usage Examples
+
+#### Time-Window Partition Variables
+For a daily partition running from 2026-01-02 to 2026-01-03:
+- `{{ var('min_date') }}` → "2026-01-02"
+- `{{ var('max_date') }}` → "2026-01-03"  
+- `{{ var('min_datetime') }}` → "2026-01-02 00:00:00"
+- `{{ var('max_datetime') }}` → "2026-01-03 00:00:00"
+
+#### Dynamic Partition Variables
+For a dynamic partition with key "US":
+- `{{ var('partition_key') }}` → "US"
+
+#### Fallback Variables
+For non-partitioned manual runs:
+- Automatically generates variables for the current day
+- Maintains consistent format with time-window partitions
+
+**Section sources**
+- [assets/dbt/vars.py:1-62](file://src/dbt_dagsterizer/assets/dbt/vars.py#L1-L62)
+- [assets/dbt/assets.py:197-201](file://src/dbt_dagsterizer/assets/dbt/assets.py#L197-L201)
+- [jobs/dbt/factory.py:62-67](file://src/dbt_dagsterizer/jobs/dbt/factory.py#L62-L67)
+- [test_dbt_vars.py:1-67](file://tests/test_dbt_vars.py#L1-L67)
+
 ## Dependency Analysis
-The build_definitions() function depends on environment preparation, orchestration configuration, and modular submodules for assets, jobs, schedules, sensors, and resources. The diagram below highlights these relationships.
+The build_definitions() function depends on environment preparation, orchestration configuration, and modular submodules for assets, jobs, schedules, sensors, and resources. The enhanced partition variable handling adds a new critical dependency in the assets and jobs modules.
 
 ```mermaid
 graph LR
@@ -302,6 +451,11 @@ A --> G["resources/__init__.py: get_resources()"]
 A --> H["orchestration_config.py: load/save/index"]
 A --> I["manifest_inputs.py: should_refresh_manifest()"]
 A --> J["partitions.py: get_daily_partitions_def()"]
+A --> K["assets/dbt/vars.py: _get_dbt_vars_for_context()"]
+C --> K
+D --> K
+K --> L["assets/dbt/assets.py: _dbt_assets()"]
+K --> M["jobs/dbt/factory.py: _build_dbt_cli_job()"]
 ```
 
 **Diagram sources**
@@ -315,6 +469,9 @@ A --> J["partitions.py: get_daily_partitions_def()"]
 - [orchestration_config.py:19-83](file://src/dbt_dagsterizer/orchestration_config.py#L19-L83)
 - [manifest_inputs.py:67-91](file://src/dbt_dagsterizer/manifest_inputs.py#L67-L91)
 - [partitions.py:10-21](file://src/dbt_dagsterizer/partitions.py#L10-L21)
+- [assets/dbt/vars.py:25-61](file://src/dbt_dagsterizer/assets/dbt/vars.py#L25-L61)
+- [assets/dbt/assets.py:197-201](file://src/dbt_dagsterizer/assets/dbt/assets.py#L197-L201)
+- [jobs/dbt/factory.py:62-67](file://src/dbt_dagsterizer/jobs/dbt/factory.py#L62-L67)
 
 **Section sources**
 - [api.py:15-72](file://src/dbt_dagsterizer/api.py#L15-L72)
@@ -327,13 +484,15 @@ A --> J["partitions.py: get_daily_partitions_def()"]
 - [orchestration_config.py:19-83](file://src/dbt_dagsterizer/orchestration_config.py#L19-L83)
 - [manifest_inputs.py:67-91](file://src/dbt_dagsterizer/manifest_inputs.py#L67-L91)
 - [partitions.py:10-21](file://src/dbt_dagsterizer/partitions.py#L10-L21)
+- [assets/dbt/vars.py:25-61](file://src/dbt_dagsterizer/assets/dbt/vars.py#L25-L61)
+- [assets/dbt/assets.py:197-201](file://src/dbt_dagsterizer/assets/dbt/assets.py#L197-L201)
+- [jobs/dbt/factory.py:62-67](file://src/dbt_dagsterizer/jobs/dbt/factory.py#L62-L67)
 
 ## Performance Considerations
 - Manifest caching: Use manifest_inputs.should_refresh_manifest() to avoid unnecessary dbt manifest regeneration when .env files or targets have not changed.
 - Environment isolation: temporary_env minimizes side effects and avoids repeated environment churn across invocations.
 - Sensor propagation mode: Prefer LUBAN_PARTITION_CHANGE_PROPAGATOR_MODE=eager in high-throughput environments to reduce sensor overhead, understanding the trade-offs described in the sensors module.
-
-[No sources needed since this section provides general guidance]
+- Enhanced partition variable handling: The new system is optimized for minimal overhead with efficient exception handling and caching of partition definitions.
 
 ## Troubleshooting Guide
 - Missing daily partitions start date:
@@ -344,10 +503,13 @@ A --> J["partitions.py: get_daily_partitions_def()"]
   - Action: Add models/*.sql and ensure dbt_project.yml and profiles.yml are present.
 - Invalid orchestration configuration:
   - Symptoms: ValueErrors raised during load_or_create or mutation operations.
-  - Resolution: Validate dagsterization.yml structure and values; refer to set_* functions’ constraints.
+  - Resolution: Validate dagsterization.yml structure and values; refer to set_* functions' constraints.
 - .env overrides not applied:
   - Cause: Keys already present in the environment take precedence.
   - Resolution: Unset conflicting environment variables or adjust .env file keys.
+- Partition variable issues:
+  - Symptom: Missing or incorrect partition variables in dbt models.
+  - Resolution: Verify partition context availability; the system automatically falls back to default daily window variables when context is not available.
 
 **Section sources**
 - [partitions.py:10-21](file://src/dbt_dagsterizer/partitions.py#L10-L21)
@@ -355,11 +517,10 @@ A --> J["partitions.py: get_daily_partitions_def()"]
 - [orchestration_config.py:46-68](file://src/dbt_dagsterizer/orchestration_config.py#L46-L68)
 - [orchestration_config.py:161-175](file://src/dbt_dagsterizer/orchestration_config.py#L161-L175)
 - [env_utils.py:61-77](file://src/dbt_dagsterizer/env_utils.py#L61-L77)
+- [assets/dbt/vars.py:25-61](file://src/dbt_dagsterizer/assets/dbt/vars.py#L25-L61)
 
 ## Conclusion
-The build_definitions() function provides a robust, modular entry point to integrate dbt projects into Dagster. By leveraging environment management, orchestration configuration, and dynamic asset/job/schedule/sensor/resource discovery, it supports flexible deployment across local and production environments. Following the best practices and patterns outlined here ensures reliable, maintainable, and performant integrations.
-
-[No sources needed since this section summarizes without analyzing specific files]
+The build_definitions() function provides a robust, modular entry point to integrate dbt projects into Dagster. The enhanced partition variable handling system significantly improves the reliability and flexibility of partition-aware dbt execution across different partition types and execution contexts. By leveraging environment management, orchestration configuration, dynamic asset/job/schedule/sensor/resource discovery, and sophisticated partition variable handling, it supports flexible deployment across local and production environments. Following the best practices and patterns outlined here ensures reliable, maintainable, and performant integrations with improved partition variable support.
 
 ## Appendices
 
@@ -371,10 +532,31 @@ Resolve --> TempEnv["Set DBT_PROJECT_DIR, DBT_PROFILES_DIR, LUBAN_DEFAULT_DBT_TA
 TempEnv --> HasModels{"Any dbt models?"}
 HasModels --> |No| Skeleton["Create project_ready asset and resources"]
 HasModels --> |Yes| LoadModules["Load assets, jobs, schedules, sensors, resources"]
-Skeleton --> ReturnDefs["Return Definitions"]
-LoadModules --> ReturnDefs
+LoadModules --> PartitionVars["Generate partition variables via _get_dbt_vars_for_context()"]
+PartitionVars --> ReturnDefs["Return Definitions"]
+Skeleton --> ReturnDefs
 ```
 
 **Diagram sources**
 - [api.py:15-72](file://src/dbt_dagsterizer/api.py#L15-L72)
 - [env_utils.py:61-77](file://src/dbt_dagsterizer/env_utils.py#L61-L77)
+- [assets/dbt/vars.py:25-61](file://src/dbt_dagsterizer/assets/dbt/vars.py#L25-L61)
+
+### Partition Variable Handling Flow
+```mermaid
+flowchart TD
+Start(["_get_dbt_vars_for_context(context)"]) --> TryTimeWin["Try: context.partition_time_window"]
+TryTimeWin --> HasTimeWin{"Time window available?"}
+HasTimeWin --> |Yes| GenTimeVars["_dbt_partition_vars_from_time_window()"]
+GenTimeVars --> ReturnTimeVars["Return {min_date, max_date, min_datetime, max_datetime}"]
+HasTimeWin --> |No| TryDynPart["Try: context.partition_key"]
+TryDynPart --> HasDynPart{"Dynamic partition key available?"}
+HasDynPart --> |Yes| ReturnDynVar["Return {'partition_key': key}"]
+HasDynPart --> |No| Fallback["_default_daily_window_vars()"]
+Fallback --> ReturnFallback["Return default daily window variables"]
+```
+
+**Diagram sources**
+- [assets/dbt/vars.py:25-61](file://src/dbt_dagsterizer/assets/dbt/vars.py#L25-L61)
+- [assets/dbt/vars.py:4-15](file://src/dbt_dagsterizer/assets/dbt/vars.py#L4-L15)
+- [assets/dbt/vars.py:18-22](file://src/dbt_dagsterizer/assets/dbt/vars.py#L18-L22)

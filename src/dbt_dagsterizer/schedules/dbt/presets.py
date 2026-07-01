@@ -8,6 +8,7 @@ def daily_at(
     offset_days: int = 1,
     enabled: bool = True,
     dedupe_across_ticks: bool = True,
+    timezone: str = "UTC",
 ):
     if not name:
         raise ValueError("Schedule name must be non-empty")
@@ -34,4 +35,5 @@ def daily_at(
         "partition_lookback_hours": 0,
         "enabled": enabled,
         "dedupe_across_ticks": dedupe_across_ticks,
+        "timezone": timezone,
     }

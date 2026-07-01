@@ -8,7 +8,7 @@ from typing import Any
 
 from ..resources.starrocks import StarRocksClient
 
-logger = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 
 
 def _get_table_relation(node: dict[str, Any]) -> tuple[str, str, str] | None:
@@ -61,7 +61,7 @@ def get_row_counts_from_starrocks(
         if count is not None:
             row_counts = int(count)
     except Exception as e:
-        logger.warning(f"Row counts: Failed to query StarRocks for {node.get('unique_id')}: {e}")
+        log.warning(f"Row counts: Failed to query StarRocks for {node.get('unique_id')}: {e}")
         return -1
     
     return row_counts

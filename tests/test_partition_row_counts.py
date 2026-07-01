@@ -70,31 +70,63 @@ def test_emit_partition_row_counts_emits_observations(tmp_path: Path):
     mock_starrocks = Mock(spec=StarRocksClient)
     mock_starrocks.query_scalar = Mock(side_effect=lambda sql: 1000 if "orders" in sql else 500)
     
+    # Build run_results with unique_ids matching the manifest nodes
+    run_results_data = {
+        "results": [
+            {
+                "unique_id": "model.demo.orders",
+                "status": "success",
+                "execution_time": 1.0,
+                "timing": [],
+                "adapter_response": {"rows_affected": 100},
+            },
+            {
+                "unique_id": "model.demo.customers",
+                "status": "success",
+                "execution_time": 1.0,
+                "timing": [],
+                "adapter_response": {"rows_affected": 50},
+            },
+        ]
+    }
+    
     # Emit observations with mocked StarRocks
     with patch("dbt_dagsterizer.assets.dbt.assets.make_starrocks_resource", return_value=mock_starrocks):
         observations = list(_emit_partition_row_counts(
             context=context,
             dbt_project_dir=tmp_path,
             translator=translator,
+            run_results_json=run_results_data,
         ))
     
     # Verify observations were emitted
-    assert len(observations) == 2
+    # Each model gets 2 observations: one for affected row count, one for total row count from StarRocks
+    assert len(observations) == 4
     
-    # Check first observation
+    # Check first observation (orders - affected row count)
     obs1 = observations[0]
     assert isinstance(obs1, dg.AssetObservation)
     assert obs1.asset_key.path == ["dbt", "db", "schema", "orders"]
-    assert "dagster/partition_row_count" in obs1.metadata
-    assert obs1.metadata["dagster/partition_row_count"].value == 1000
-    assert "partition_key" in obs1.metadata
-    assert obs1.metadata["partition_key"].value == "2026-01-01"
+    assert "last_run_affected_row_count" in obs1.metadata
+    assert obs1.metadata["last_run_affected_row_count"].value == 100
     
-    # Check second observation
+    # Check second observation (orders - total row count from StarRocks)
     obs2 = observations[1]
     assert isinstance(obs2, dg.AssetObservation)
-    assert obs2.asset_key.path == ["dbt", "db", "schema", "customers"]
-    assert obs2.metadata["dagster/partition_row_count"].value == 500
+    assert obs2.asset_key.path == ["dbt", "db", "schema", "orders"]
+    assert "dagster/row_count" in obs2.metadata
+    
+    # Check third observation (customers - affected row count)
+    obs3 = observations[2]
+    assert isinstance(obs3, dg.AssetObservation)
+    assert obs3.asset_key.path == ["dbt", "db", "schema", "customers"]
+    assert obs3.metadata["last_run_affected_row_count"].value == 50
+    
+    # Check fourth observation (customers - total row count from StarRocks)
+    obs4 = observations[3]
+    assert isinstance(obs4, dg.AssetObservation)
+    assert obs4.asset_key.path == ["dbt", "db", "schema", "customers"]
+    assert "dagster/row_count" in obs4.metadata
 
 
 def test_emit_partition_row_counts_skips_missing_files(tmp_path: Path):
@@ -113,6 +145,7 @@ def test_emit_partition_row_counts_skips_missing_files(tmp_path: Path):
         context=context,
         dbt_project_dir=tmp_path,
         translator=translator,
+        run_results_json=None,
     ))
     
     assert len(observations) == 0
@@ -162,6 +195,7 @@ def test_emit_partition_row_counts_handles_no_rows_affected(tmp_path: Path):
         context=context,
         dbt_project_dir=tmp_path,
         translator=translator,
+        run_results_json=run_results_data,
     ))
     
     # No observations should be emitted since rows_affected is missing
@@ -213,10 +247,11 @@ def test_emit_partition_row_counts_non_partitioned_run(tmp_path: Path):
         context=context,
         dbt_project_dir=tmp_path,
         translator=translator,
+        run_results_json=run_results_data,
     ))
     
     assert len(materializations) == 1
     mat = materializations[0]
-    assert mat.metadata["dagster/partition_row_count"].value == 1000
+    assert mat.metadata["last_run_affected_row_count"].value == 1000
     # partition_key should not be in metadata for non-partitioned runs
     assert "partition_key" not in mat.metadata

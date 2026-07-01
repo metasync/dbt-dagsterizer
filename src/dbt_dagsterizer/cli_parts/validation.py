@@ -226,6 +226,13 @@ def validate_orchestration(
 
 def validate_orchestration_structure(*, orchestration: dict[str, Any]) -> list[ValidationIssue]:
     issues: list[ValidationIssue] = []
+
+    # Validate timezone
+    raw_tz = orchestration.get("timezone")
+    if raw_tz is not None:
+        if not isinstance(raw_tz, str) or not raw_tz.strip():
+            issues.append(ValidationIssue("error", "timezone must be a non-empty string"))
+
     try:
         idx = index_orch(orchestration)
     except ValueError as e:

@@ -48,8 +48,8 @@ def build_replication_jobs(job_specs: list[dict]) -> list:
         )
 
         # Select the single replication asset by its key
-        # AssetKey path is ["replication", model_name] — the asset name is a flat string
-        selection = AssetSelection.keys(AssetKey([asset_key_str]))
+        # AssetKey path is ["replication", asset_name] due to key_prefix
+        selection = AssetSelection.keys(AssetKey(["replication", asset_key_str]))
 
         jobs.append(
             define_asset_job(

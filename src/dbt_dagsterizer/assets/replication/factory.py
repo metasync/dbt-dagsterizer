@@ -79,6 +79,7 @@ def build_replication_assets(specs: list[dict]) -> list[dg.AssetsDefinition]:
         def _make_asset(_spec: dict, _partitions_def: dg.PartitionsDefinition | None, _dep_key: dg.AssetKey):
             @dg.asset(
                 name=_spec["name"],
+                key_prefix="replication",
                 deps=[_dep_key],
                 partitions_def=_partitions_def,
                 group_name="replication",

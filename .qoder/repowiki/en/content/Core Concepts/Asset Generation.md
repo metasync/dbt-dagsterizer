@@ -16,18 +16,27 @@
 - [run_results.py](file://src/dbt_dagsterizer/dbt/run_results.py)
 - [dbt.py](file://src/dbt_dagsterizer/resources/dbt.py)
 - [vars.py](file://src/dbt_dagsterizer/assets/dbt/vars.py)
+- [replication/__init__.py](file://src/dbt_dagsterizer/assets/replication/__init__.py)
+- [replication/auto_config.py](file://src/dbt_dagsterizer/assets/replication/auto_config.py)
+- [replication/factory.py](file://src/dbt_dagsterizer/assets/replication/factory.py)
+- [replication/executor.py](file://src/dbt_dagsterizer/assets/replication/executor.py)
+- [jobs/replication/factory.py](file://src/dbt_dagsterizer/jobs/replication/factory.py)
+- [schedules/replication/factory.py](file://src/dbt_dagsterizer/schedules/replication/factory.py)
 - [test_assets_retry.py](file://tests/test_assets_retry.py)
 - [test_observable_sources.py](file://tests/test_observable_sources.py)
 - [test_dynamic_partitions.py](file://tests/test_dynamic_partitions.py)
+- [test_replication_assets.py](file://tests/test_replication_assets.py)
+- [test_replication_config.py](file://tests/test_replication_config.py)
 </cite>
 
 ## Update Summary
 **Changes Made**
-- Enhanced dynamic partition support documentation with comprehensive configuration examples
-- Updated translator section to reflect improved partition resolution logic for dynamic partitions
-- Added detailed coverage of dynamic partition registry and initialization process
-- Expanded partitioning documentation with practical dynamic partition configuration scenarios
-- Updated architecture diagrams to show dynamic partition integration flow
+- Added comprehensive documentation for replication asset generation and organization
+- Documented the new replication asset grouping with key_prefix='replication' and group_name='replication'
+- Added detailed coverage of StarRocks to SQL Server replication workflow
+- Updated asset generation architecture to include replication assets alongside dbt assets
+- Enhanced asset key patterns to include replication asset organization
+- Added replication configuration and orchestration integration documentation
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -35,22 +44,24 @@
 3. [Core Components](#core-components)
 4. [Architecture Overview](#architecture-overview)
 5. [Detailed Component Analysis](#detailed-component-analysis)
-6. [Dynamic Partition Support](#dynamic-partition-support)
-7. [Dependency Analysis](#dependency-analysis)
-8. [Performance Considerations](#performance-considerations)
-9. [Troubleshooting Guide](#troubleshooting-guide)
-10. [Conclusion](#conclusion)
-11. [Appendices](#appendices)
+6. [Replication Asset Generation](#replication-asset-generation)
+7. [Dynamic Partition Support](#dynamic-partition-support)
+8. [Dependency Analysis](#dependency-analysis)
+9. [Performance Considerations](#performance-considerations)
+10. [Troubleshooting Guide](#troubleshooting-guide)
+11. [Conclusion](#conclusion)
+12. [Appendices](#appendices)
 
 ## Introduction
-This document explains how dbt manifests are translated into Dagster assets, covering asset key generation, dependency mapping, metadata extraction, and observable source integration. It documents how different dbt model types (incremental, table, view, seed) are handled conceptually, how partitioning and automation conditions are inferred, and how asset preparation ensures manifests are ready before asset definition. The document now includes comprehensive coverage of dynamic partition support, enabling arbitrary (non-time-based) partition dimensions like country codes, tenant IDs, and other categorical data.
+This document explains how dbt manifests are translated into Dagster assets, covering asset key generation, dependency mapping, metadata extraction, and observable source integration. It documents how different dbt model types (incremental, table, view, seed) are handled conceptually, how partitioning and automation conditions are inferred, and how asset preparation ensures manifests are ready before asset definition. The document now includes comprehensive coverage of dynamic partition support, replication asset generation, and enhanced asset organization with dedicated replication asset grouping.
 
 ## Project Structure
-The asset generation pipeline centers around three primary areas:
+The asset generation pipeline centers around four primary areas:
 - dbt-to-Dagster asset translation and runtime execution
 - Observable source asset creation from dbt source metadata
 - Manifest preparation and orchestration configuration
 - Dynamic partition management and registration
+- **New**: Replication asset generation for StarRocks to SQL Server data movement
 
 ```mermaid
 graph TB
@@ -61,6 +72,10 @@ A3["assets/dbt/prepare.py"]
 A4["assets/dbt/vars.py"]
 A5["assets/sources/factory.py"]
 A6["assets/sources/automation.py"]
+A7["assets/replication/__init__.py"]
+A8["assets/replication/auto_config.py"]
+A9["assets/replication/factory.py"]
+A10["assets/replication/executor.py"]
 end
 subgraph "dbt"
 D1["dbt/manifest.py"]
@@ -76,6 +91,10 @@ subgraph "Dynamic Partitions"
 DP1["partitions_dynamic.py"]
 DP2["partitions_registry.py"]
 end
+subgraph "Jobs & Schedules"
+J1["jobs/replication/factory.py"]
+S1["schedules/replication/factory.py"]
+end
 A1 --> A2
 A1 --> A3
 A1 --> A4
@@ -90,6 +109,15 @@ A1 --> DP2
 A5 --> A1
 A6 --> D1
 A6 --> D2
+A7 --> A8
+A7 --> A9
+A8 --> D1
+A9 --> A10
+A9 --> DP1
+A9 --> DP2
+A9 --> I3
+J1 --> A9
+S1 --> J1
 ```
 
 **Diagram sources**
@@ -107,6 +135,12 @@ A6 --> D2
 - [partitions_dynamic.py:1-128](file://src/dbt_dagsterizer/partitions_dynamic.py#L1-L128)
 - [partitions_registry.py:1-85](file://src/dbt_dagsterizer/partitions_registry.py#L1-L85)
 - [orchestration_config.py:112-158](file://src/dbt_dagsterizer/orchestration_config.py#L112-L158)
+- [replication/__init__.py:1-18](file://src/dbt_dagsterizer/assets/replication/__init__.py#L1-L18)
+- [replication/auto_config.py:1-79](file://src/dbt_dagsterizer/assets/replication/auto_config.py#L1-L79)
+- [replication/factory.py:1-102](file://src/dbt_dagsterizer/assets/replication/factory.py#L1-L102)
+- [replication/executor.py:1-212](file://src/dbt_dagsterizer/assets/replication/executor.py#L1-L212)
+- [jobs/replication/factory.py:1-64](file://src/dbt_dagsterizer/jobs/replication/factory.py#L1-L64)
+- [schedules/replication/factory.py:1-108](file://src/dbt_dagsterizer/schedules/replication/factory.py#L1-L108)
 
 **Section sources**
 - [assets.py:40-113](file://src/dbt_dagsterizer/assets/dbt/assets.py#L40-L113)
@@ -122,14 +156,21 @@ A6 --> D2
 - [partitions_dynamic.py:1-128](file://src/dbt_dagsterizer/partitions_dynamic.py#L1-L128)
 - [partitions_registry.py:1-85](file://src/dbt_dagsterizer/partitions_registry.py#L1-L85)
 - [orchestration_config.py:112-158](file://src/dbt_dagsterizer/orchestration_config.py#L112-L158)
+- [replication/__init__.py:1-18](file://src/dbt_dagsterizer/assets/replication/__init__.py#L1-L18)
+- [replication/auto_config.py:1-79](file://src/dbt_dagsterizer/assets/replication/auto_config.py#L1-L79)
+- [replication/factory.py:1-102](file://src/dbt_dagsterizer/assets/replication/factory.py#L1-L102)
+- [replication/executor.py:1-212](file://src/dbt_dagsterizer/assets/replication/executor.py#L1-L212)
+- [jobs/replication/factory.py:1-64](file://src/dbt_dagsterizer/jobs/replication/factory.py#L1-L64)
+- [schedules/replication/factory.py:1-108](file://src/dbt_dagsterizer/schedules/replication/factory.py#L1-L108)
 
 ## Core Components
 - Asset definition and runtime: The dbt assets decorator is configured with a translator and a prepared manifest. It streams dbt CLI execution, injects partition variables, and records telemetry.
 - Translator: Provides asset keys, groups, partitions, and automation conditions based on dbt resource properties and orchestration configuration. Now includes dynamic partition support through the `dynamic_partitions_defs` parameter.
 - Manifest preparation: Ensures a fresh dbt manifest exists before asset loading, optionally invoking deps and parse.
 - Observable sources: Reads dbt source metadata to define observable source assets that track watermark columns or SQL expressions.
+- **New**: Replication assets: Automatically generates Dagster assets for StarRocks to SQL Server data replication based on orchestration configuration.
 - Partitioning: Supplies both daily partitions definition and dynamic partitions definitions when requested by the translator.
-- Orchestration index: Indexes partition types and job assignments for models from a YAML configuration, including dynamic partition configurations.
+- Orchestration index: Indexes partition types and job assignments for models from a YAML configuration, including dynamic partition configurations and replication settings.
 
 **Section sources**
 - [assets.py:40-113](file://src/dbt_dagsterizer/assets/dbt/assets.py#L40-L113)
@@ -141,9 +182,11 @@ A6 --> D2
 - [partitions_dynamic.py:1-128](file://src/dbt_dagsterizer/partitions_dynamic.py#L1-L128)
 - [partitions_registry.py:1-85](file://src/dbt_dagsterizer/partitions_registry.py#L1-L85)
 - [orchestration_config.py:112-158](file://src/dbt_dagsterizer/orchestration_config.py#L112-L158)
+- [replication/auto_config.py:25-79](file://src/dbt_dagsterizer/assets/replication/auto_config.py#L25-L79)
+- [replication/factory.py:52-102](file://src/dbt_dagsterizer/assets/replication/factory.py#L52-L102)
 
 ## Architecture Overview
-The asset generation pipeline integrates dbt's manifest with Dagster's asset graph through a translator and runtime execution, now enhanced with dynamic partition support.
+The asset generation pipeline integrates dbt's manifest with Dagster's asset graph through a translator and runtime execution, now enhanced with dynamic partition support and replication asset generation.
 
 ```mermaid
 sequenceDiagram
@@ -304,15 +347,19 @@ Src-->>Build : Asset definition
 - Asset keys are relation-based: dbt/<database>/<schema>/<identifier>, with empty components omitted.
 - Group names are derived from the model's file path or FQN to organize assets under logical folders.
 - Dependencies are inferred by Dagster from the dbt manifest and translator configuration.
+- **New**: Replication assets use key_prefix="replication" and group_name="replication" for organized asset grouping.
 
 Examples (conceptual):
 - Asset key pattern: dbt/ods/orders
 - Group derivation: models/dwd/customers → group "dwd"
+- **New**: Replication asset key pattern: replication/replicate_orders
+- **New**: Replication asset group: replication
 - Dependency chain: incremental model depends on upstream table/view seeds
 
 **Section sources**
 - [translator.py:12-42](file://src/dbt_dagsterizer/assets/dbt/translator.py#L12-L42)
 - [translator.py:88-106](file://src/dbt_dagsterizer/assets/dbt/translator.py#L88-L106)
+- [replication/factory.py:79-96](file://src/dbt_dagsterizer/assets/replication/factory.py#L79-L96)
 
 ### Metadata Extraction and Enrichment
 - dbt manifest metadata is loaded and indexed to extract tags, meta, and resource properties.
@@ -330,6 +377,74 @@ Examples (conceptual):
 **Section sources**
 - [assets.py:71-93](file://src/dbt_dagsterizer/assets/dbt/assets.py#L71-L93)
 - [translator.py:88-116](file://src/dbt_dagsterizer/assets/dbt/translator.py#L88-L116)
+
+## Replication Asset Generation
+
+### Replication Asset Overview
+The replication system automatically generates Dagster assets for copying dbt model data from StarRocks to SQL Server. Each replication asset:
+- Depends on the corresponding dbt model asset via `deps=[AssetKey(source_relation)]`
+- Uses the same partition definition as the dbt model (daily/dynamic/unpartitioned)
+- Executes `execute_replication` when materialized
+- Organized under key_prefix="replication" and group_name="replication"
+
+### Replication Configuration
+Replication is configured in `dagsterization.yml` under the `replication` section:
+- `enabled`: Boolean flag to enable/disable replication
+- `entries`: List of replication configurations for specific models
+- Each entry includes: model name, destination table/schema, write disposition, partition column, and optional primary key
+
+### Auto-Configuration Process
+The replication auto-config process:
+1. Reads replication configuration from orchestration file
+2. Validates dbt model existence in manifest
+3. Maps dbt model relations to StarRocks source database/schema/table
+4. Determines partition type from orchestration configuration
+5. Generates replication specs with source/destination details
+
+### Replication Asset Factory
+The replication factory creates Dagster assets with:
+- `key_prefix="replication"` for asset key organization
+- `group_name="replication"` for asset grouping
+- Automatic dependency on source dbt model asset
+- Partition definition matching the source model's partitioning
+- `automation_condition=dg.AutomationCondition.eager()` for immediate execution
+
+### Replication Executor
+The replication executor handles the actual data movement:
+- Uses dlt (Data Layer Toolkit) for efficient data transfer
+- Supports three write dispositions: "append", "replace", "merge"
+- Handles partition-aware replication with conditional deletion for replace operations
+- Creates primary key constraints on destination tables when specified
+- Logs detailed load information and row counts
+
+```mermaid
+sequenceDiagram
+participant AC as "auto_config.build_auto_replication_specs()"
+participant ORCH as "orchestration_config.index()"
+participant MF as "load_manifest()"
+participant FAC as "factory.build_replication_assets()"
+participant EXE as "executor.execute_replication()"
+AC->>ORCH : Load replication config
+AC->>MF : Load dbt manifest
+AC->>FAC : Generate specs with source/dest info
+FAC->>EXE : Execute replication on materialization
+EXE->>EXE : Handle partition-aware copy
+EXE->>EXE : Apply write disposition (append/replace/merge)
+EXE-->>FAC : Complete with load info
+```
+
+**Diagram sources**
+- [replication/auto_config.py:25-79](file://src/dbt_dagsterizer/assets/replication/auto_config.py#L25-L79)
+- [replication/factory.py:52-102](file://src/dbt_dagsterizer/assets/replication/factory.py#L52-L102)
+- [replication/executor.py:18-212](file://src/dbt_dagsterizer/assets/replication/executor.py#L18-L212)
+
+**Section sources**
+- [replication/__init__.py:6-17](file://src/dbt_dagsterizer/assets/replication/__init__.py#L6-L17)
+- [replication/auto_config.py:25-79](file://src/dbt_dagsterizer/assets/replication/auto_config.py#L25-L79)
+- [replication/factory.py:52-102](file://src/dbt_dagsterizer/assets/replication/factory.py#L52-L102)
+- [replication/executor.py:18-212](file://src/dbt_dagsterizer/assets/replication/executor.py#L18-L212)
+- [orchestration_config.py:18-28](file://src/dbt_dagsterizer/orchestration_config.py#L18-L28)
+- [orchestration_config.py:563-616](file://src/dbt_dagsterizer/orchestration_config.py#L563-L616)
 
 ## Dynamic Partition Support
 
@@ -381,15 +496,16 @@ Dynamic partition keys are managed at runtime through the Dagster instance:
 - [test_dynamic_partitions.py:154-200](file://tests/test_dynamic_partitions.py#L154-L200)
 
 ## Dependency Analysis
-The asset generation module exhibits low coupling and clear separation of concerns, now enhanced with dynamic partition support:
+The asset generation module exhibits low coupling and clear separation of concerns, now enhanced with dynamic partition support and replication asset generation:
 - assets.py orchestrates loading, preparation, translation, execution, and dynamic partition registry loading.
 - translator.py encapsulates key/group/partition/automation logic, including dynamic partition handling.
 - manifest.py and manifest_prepare.py handle manifest lifecycle.
 - partitions.py supplies daily partition definitions.
 - partitions_dynamic.py manages dynamic partition creation and caching.
 - partitions_registry.py provides centralized dynamic partition initialization from orchestration config.
-- orchestration_config.py provides model-to-partition and job mappings, including dynamic partition configurations.
+- orchestration_config.py provides model-to-partition and job mappings, including dynamic partition configurations and replication settings.
 - factory.py and automation.py integrate observable sources from dbt metadata.
+- **New**: replication modules handle StarRocks to SQL Server data replication with dedicated asset organization.
 
 ```mermaid
 graph LR
@@ -407,6 +523,12 @@ Auto["automation.py"] --> Manifest
 Auto --> ManifestPrep
 DynReg --> Orch
 DynReg --> DynPart
+RepInit["replication/__init__.py"] --> RepAuto["replication/auto_config.py"]
+RepAuto --> Manifest
+RepFactory["replication/factory.py"] --> RepExec["replication/executor.py"]
+RepFactory --> Orch
+RepJobs["jobs/replication/factory.py"] --> RepFactory
+RepSched["schedules/replication/factory.py"] --> RepJobs
 ```
 
 **Diagram sources**
@@ -421,6 +543,12 @@ DynReg --> DynPart
 - [orchestration_config.py:112-158](file://src/dbt_dagsterizer/orchestration_config.py#L112-L158)
 - [factory.py:13-86](file://src/dbt_dagsterizer/assets/sources/factory.py#L13-L86)
 - [automation.py:15-47](file://src/dbt_dagsterizer/assets/sources/automation.py#L15-L47)
+- [replication/__init__.py:1-18](file://src/dbt_dagsterizer/assets/replication/__init__.py#L1-L18)
+- [replication/auto_config.py:1-79](file://src/dbt_dagsterizer/assets/replication/auto_config.py#L1-L79)
+- [replication/factory.py:1-102](file://src/dbt_dagsterizer/assets/replication/factory.py#L1-L102)
+- [replication/executor.py:1-212](file://src/dbt_dagsterizer/assets/replication/executor.py#L1-L212)
+- [jobs/replication/factory.py:1-64](file://src/dbt_dagsterizer/jobs/replication/factory.py#L1-L64)
+- [schedules/replication/factory.py:1-108](file://src/dbt_dagsterizer/schedules/replication/factory.py#L1-L108)
 
 **Section sources**
 - [assets.py:40-113](file://src/dbt_dagsterizer/assets/dbt/assets.py#L40-L113)
@@ -434,12 +562,19 @@ DynReg --> DynPart
 - [orchestration_config.py:112-158](file://src/dbt_dagsterizer/orchestration_config.py#L112-L158)
 - [factory.py:13-86](file://src/dbt_dagsterizer/assets/sources/factory.py#L13-L86)
 - [automation.py:15-47](file://src/dbt_dagsterizer/assets/sources/automation.py#L15-L47)
+- [replication/__init__.py:1-18](file://src/dbt_dagsterizer/assets/replication/__init__.py#L1-L18)
+- [replication/auto_config.py:1-79](file://src/dbt_dagsterizer/assets/replication/auto_config.py#L1-L79)
+- [replication/factory.py:1-102](file://src/dbt_dagsterizer/assets/replication/factory.py#L1-L102)
+- [replication/executor.py:1-212](file://src/dbt_dagsterizer/assets/replication/executor.py#L1-L212)
+- [jobs/replication/factory.py:1-64](file://src/dbt_dagsterizer/jobs/replication/factory.py#L1-L64)
+- [schedules/replication/factory.py:1-108](file://src/dbt_dagsterizer/schedules/replication/factory.py#L1-L108)
 
 ## Performance Considerations
 - Manifest preparation: Running dbt deps and parse adds overhead; caching and environment checks prevent unnecessary work.
 - Partition variables: Injecting time windows avoids scanning entire datasets when partitions are used.
 - Telemetry: Recording run results and manifest nodes enriches observability but should be tuned via environment variables to avoid excessive event volume.
 - Dynamic partition caching: Dynamic partitions are cached globally to avoid repeated creation overhead and maintain consistent partition definitions across the application.
+- **New**: Replication performance: dlt library provides efficient data transfer; partition-aware replication minimizes data movement; write dispositions optimized for performance.
 
 ## Troubleshooting Guide
 - Manifest not found: Ensure DBT_PROJECT_DIR or LUBAN_REPO_ROOT is set correctly so dbt project/profiles discovery succeeds.
@@ -448,6 +583,7 @@ DynReg --> DynPart
 - Observable source resolution: If asset key resolution fails, confirm the source/table mapping and available output names.
 - Dynamic partition configuration: Ensure dynamic partition names in orchestration config match the "dynamic:name" format and that partition keys are properly initialized.
 - Mixed partition types: When using dynamic partitions, ensure all models in the same @dbt_assets have the same partition type to avoid lineage conflicts.
+- **New**: Replication configuration: Verify replication.enabled is True and entries contain valid dbt model names; check StarRocks and SQL Server connection credentials; ensure write dispositions are valid ("append", "replace", "merge").
 
 **Section sources**
 - [dbt.py:27-95](file://src/dbt_dagsterizer/resources/dbt.py#L27-L95)
@@ -456,37 +592,46 @@ DynReg --> DynPart
 - [factory.py:31-44](file://src/dbt_dagsterizer/assets/sources/factory.py#L31-L44)
 - [partitions_dynamic.py:38-41](file://src/dbt_dagsterizer/partitions_dynamic.py#L38-L41)
 - [test_dynamic_partitions.py:75-90](file://tests/test_dynamic_partitions.py#L75-L90)
+- [test_replication_config.py:119-134](file://tests/test_replication_config.py#L119-L134)
+- [test_replication_assets.py:182-203](file://tests/test_replication_assets.py#L182-L203)
 
 ## Conclusion
-The asset generation pipeline converts dbt manifests into a Dagster asset graph by translating dbt resource properties into asset keys, groups, partitions, and automation conditions. Manifest preparation, partition variable injection, and telemetry ensure robust and observable execution. Observable sources are automatically created from dbt source metadata, enabling watermark-driven asset updates. Orchestration configuration provides a declarative way to manage partitions and job assignments. The enhanced dynamic partition support enables flexible, arbitrary partition dimensions for complex business scenarios while maintaining asset lineage integrity.
+The asset generation pipeline converts dbt manifests into a Dagster asset graph by translating dbt resource properties into asset keys, groups, partitions, and automation conditions. Manifest preparation, partition variable injection, and telemetry ensure robust and observable execution. Observable sources are automatically created from dbt source metadata, enabling watermark-driven asset updates. Orchestration configuration provides a declarative way to manage partitions and job assignments. The enhanced dynamic partition support enables flexible, arbitrary partition dimensions for complex business scenarios while maintaining asset lineage integrity. **New**: Replication asset generation provides automated StarRocks to SQL Server data movement with organized asset grouping, partition-aware processing, and configurable write dispositions for efficient data synchronization.
 
 ## Appendices
 
 ### Appendix A: Asset Key Pattern Reference
 - Relation-based key: dbt/<database>/<schema>/<identifier>
+- **New**: Replication asset key: replication/<replicate_model_name>
 - Empty components are omitted; examples:
   - dbt/ods/orders
   - dbt/schema/clients
   - dbt/my_table
+  - **New**: replication/replicate_orders
 
 **Section sources**
 - [translator.py:12-42](file://src/dbt_dagsterizer/assets/dbt/translator.py#L12-L42)
+- [replication/factory.py:80-86](file://src/dbt_dagsterizer/assets/replication/factory.py#L80-L86)
 
 ### Appendix B: Dependency Chain Example
 - Seed → View → Table
 - Incremental model depends on upstream materialized tables or views
+- **New**: Replication asset depends on source dbt model asset
 
 **Section sources**
 - [translator.py:88-106](file://src/dbt_dagsterizer/assets/dbt/translator.py#L88-L106)
+- [replication/factory.py:76-77](file://src/dbt_dagsterizer/assets/replication/factory.py#L76-L77)
 
 ### Appendix C: Metadata Enrichment Examples
 - Partition type: daily/unpartitioned/dynamic:name per model
 - Automation condition: eager for specific model families/tags and automation observable tables
 - Grouping: derived from file path or FQN
+- **New**: Replication metadata: source/destination database/schema/table, write disposition, partition column, primary key
 
 **Section sources**
 - [orchestration_config.py:112-158](file://src/dbt_dagsterizer/orchestration_config.py#L112-L158)
 - [translator.py:58-80](file://src/dbt_dagsterizer/assets/dbt/translator.py#L58-L80)
+- [replication/auto_config.py:62-75](file://src/dbt_dagsterizer/assets/replication/auto_config.py#L62-L75)
 
 ### Appendix D: Dynamic Partition Configuration Examples
 - Daily partition: `"daily"` in orchestration config
@@ -555,8 +700,62 @@ jobs:
     include_upstream: true
 ```
 
+### Appendix E: Replication Configuration Examples
+**Basic Replication Setup**
+```yaml
+replication:
+  enabled: true
+  entries:
+    - model: orders
+      destination_table: orders
+      destination_schema: dbo
+      write_disposition: replace
+      partition_column: order_date
+      primary_key: order_id
+    
+    - model: customers
+      destination_table: customers
+      destination_schema: replication
+      write_disposition: append
+
+jobs:
+  replicate_orders_job:
+    models: [replicate_orders]
+    partitions: daily
+    include_upstream: true
+  
+  replicate_customers_job:
+    models: [replicate_customers]
+    partitions: unpartitioned
+    include_upstream: false
+```
+
+**Partition-Aware Replication**
+```yaml
+replication:
+  enabled: true
+  entries:
+    - model: sales_by_region
+      destination_table: sales_by_region
+      destination_schema: dbo
+      write_disposition: replace
+      partition_column: sale_date
+      primary_key: sale_id
+
+partitions:
+  daily:
+    - sales_by_region
+
+schedules:
+  replicate_sales_by_region_schedule:
+    cron_schedule: "0 2 * * *"
+    job_name: replicate_sales_by_region_job
+    partition_type: daily
+```
+
 **Section sources**
 - [orchestration_config.py:137-159](file://src/dbt_dagsterizer/orchestration_config.py#L137-L159)
 - [translator.py:134-136](file://src/dbt_dagsterizer/assets/dbt/translator.py#L134-L136)
 - [test_dynamic_partitions.py:95-120](file://tests/test_dynamic_partitions.py#L95-L120)
-- [IMPLEMENTATION_SUMMARY.md:176-219](file://IMPLEMENTATION_SUMMARY.md#L176-L219)
+- [test_replication_config.py:181-220](file://tests/test_replication_config.py#L181-L220)
+- [test_replication_assets.py:112-180](file://tests/test_replication_assets.py#L112-L180)

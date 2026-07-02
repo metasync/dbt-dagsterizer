@@ -14,15 +14,25 @@
 - [dynamic_partitions_bootstrap.py](file://src/dbt_dagsterizer/sensors/dynamic_partitions_bootstrap.py)
 - [partitions_dynamic.py](file://src/dbt_dagsterizer/partitions_dynamic.py)
 - [partitions.py](file://src/dbt_dagsterizer/partitions.py)
+- [auto_config.py](file://src/dbt_dagsterizer/assets/replication/auto_config.py)
+- [executor.py](file://src/dbt_dagsterizer/assets/replication/executor.py)
+- [factory.py](file://src/dbt_dagsterizer/assets/replication/factory.py)
+- [auto_config.py](file://src/dbt_dagsterizer/jobs/replication/auto_config.py)
+- [factory.py](file://src/dbt_dagsterizer/jobs/replication/factory.py)
+- [auto_config.py](file://src/dbt_dagsterizer/schedules/replication/auto_config.py)
+- [factory.py](file://src/dbt_dagsterizer/schedules/replication/factory.py)
+- [starrocks.py](file://src/dbt_dagsterizer/resources/starrocks.py)
+- [mssql.py](file://src/dbt_dagsterizer/resources/mssql.py)
 </cite>
 
 ## Update Summary
 **Changes Made**
-- Added documentation for the new `include_current_day_partition` option in the `partitions.daily_config` section
-- Updated the Daily Partition Configuration section with detailed explanation of the new feature
-- Enhanced the CLI documentation to include the new `--include-current-day-partition` flag
-- Added comprehensive examples demonstrating both `true` and `false` values for the new option
-- Updated validation documentation to reflect the new configuration parameter
+- Added comprehensive documentation for the new StarRocks-to-Microsoft SQL Server replication system
+- Documented replication configuration syntax, write dispositions (append, replace, merge), and partition-aware behavior
+- Added practical usage scenarios for dbt-dagsterizer users requiring downstream SQL Server access
+- Included detailed examples of replication configuration and execution flow
+- Documented resource management for StarRocks and SQL Server connections
+- Enhanced timezone configuration capabilities and global schedule execution timezone support
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -30,20 +40,20 @@
 3. [Core Components](#core-components)
 4. [Architecture Overview](#architecture-overview)
 5. [Detailed Component Analysis](#detailed-component-analysis)
-6. [Dependency Analysis](#dependency-analysis)
-7. [Performance Considerations](#performance-considerations)
-8. [Troubleshooting Guide](#troubleshooting-guide)
-9. [Conclusion](#conclusion)
+6. [Replication System](#replication-system)
+7. [Timezone Configuration](#timezone-configuration)
+8. [Dependency Analysis](#dependency-analysis)
+9. [Performance Considerations](#performance-considerations)
+10. [Troubleshooting Guide](#troubleshooting-guide)
+11. [Conclusion](#conclusion)
 
 ## Introduction
-This document provides comprehensive documentation for the Dagsterization YAML Configuration system used by dbt-dagsterizer. The `dagsterization.yml` file serves as the single source of truth for Dagster orchestration intent in dbt projects, bridging dbt metadata with Dagster orchestration through partitioning strategies, job definitions, schedules, and partition change sensors.
+This document provides comprehensive documentation for the Dagsterization YAML Configuration system used by dbt-dagsterizer. The `dagsterization.yml` file serves as the single source of truth for Dagster orchestration intent in dbt projects, bridging dbt metadata with Dagster orchestration through partitioning strategies, job definitions, schedules, partition change sensors, and the new StarRocks-to-Microsoft SQL Server replication system.
 
-The configuration system enables declarative orchestration of dbt models in Dagster, supporting both time-based daily partitions and flexible dynamic partitions for non-temporal dimensions like country codes or tenant IDs.
-
-**Updated** Added support for the new `include_current_day_partition` option in the `partitions.daily_config` section, allowing users to control whether today's partition is available in the DailyPartitionsDefinition.
+**Updated** Added support for the new StarRocks-to-Microsoft SQL Server replication system, enabling downstream SQL Server access for dbt-dagsterizer users. The replication system supports three write dispositions (append, replace, merge) with partition-aware behavior, integrates seamlessly with existing orchestration configuration, and provides comprehensive timezone configuration capabilities for global schedule execution.
 
 ## Project Structure
-The Dagsterization YAML configuration system is organized around several key components:
+The Dagsterization YAML configuration system is organized around several key components with enhanced replication capabilities:
 
 ```mermaid
 graph TB
@@ -51,6 +61,8 @@ subgraph "Configuration Layer"
 YML[dagsterization.yml]
 ORCH[orchestration_config.py]
 VALID[validation.py]
+REPL[replication Section]
+TIMEZONE[timezone Field]
 END_OFFSET[include_current_day_partition]
 end
 subgraph "Runtime Layer"
@@ -65,8 +77,18 @@ DYNAMIC[partitions_dynamic.py]
 DAILY[partitions.py]
 INDEX[OrchestrationIndex]
 end
+subgraph "Replication Layer"
+AUTO_CONFIG[assets/replication/auto_config.py]
+EXECUTOR[assets/replication/executor.py]
+FACTORY[assets/replication/factory.py]
+REPL_JOBS[jobs/replication/auto_config.py]
+REPL_SCHEDULES[schedules/replication/auto_config.py]
+RESOURCES[resources/starrocks.py & mssql.py]
+end
 YML --> ORCH
 ORCH --> VALID
+ORCH --> REPL
+ORCH --> TIMEZONE
 ORCH --> END_OFFSET
 ORCH --> JOBS
 ORCH --> SCHEDULES
@@ -76,6 +98,11 @@ ORCH --> BOOTSTRAP
 ORCH --> DYNAMIC
 ORCH --> DAILY
 ORCH --> INDEX
+REPL --> AUTO_CONFIG
+AUTO_CONFIG --> EXECUTOR
+EXECUTOR --> RESOURCES
+REPL_JOBS --> REPL_SCHEDULES
+REPL_SCHEDULES --> EXECUTOR
 ```
 
 **Diagram sources**
@@ -83,15 +110,17 @@ ORCH --> INDEX
 - [orchestration_config.py:120-191](file://src/dbt_dagsterizer/orchestration_config.py#L120-L191)
 - [validation.py:22-212](file://src/dbt_dagsterizer/cli_parts/validation.py#L22-L212)
 - [partitions.py:10-30](file://src/dbt_dagsterizer/partitions.py#L10-L30)
+- [auto_config.py:1-79](file://src/dbt_dagsterizer/assets/replication/auto_config.py#L1-L79)
+- [executor.py:18-102](file://src/dbt_dagsterizer/assets/replication/executor.py#L18-L102)
 
 **Section sources**
 - [dagsterization.yml:1-50](file://src/dbt_dagsterizer/project_templates/luban-dagster-dbt-starrocks-code-location-source-template/{{cookiecutter.output_name}}/dbt_project/dagsterization.yml#L1-L50)
-- [dagsterization-yml.md:1-707](file://docs/concepts/dagsterization-yml.md#L1-L707)
+- [dagsterization-yml.md:1-864](file://docs/concepts/dagsterization-yml.md#L1-L864)
 
 ## Core Components
 
 ### Configuration File Structure
-The `dagsterization.yml` file follows a hierarchical structure with six primary sections:
+The `dagsterization.yml` file follows a hierarchical structure with eight primary sections including enhanced timezone support:
 
 ```mermaid
 flowchart TD
@@ -102,19 +131,19 @@ VERSION --> JOBS[jobs Section]
 VERSION --> ASSET_JOBS[asset_jobs Section]
 VERSION --> SCHEDULES[schedules Section]
 VERSION --> PARTITION_CHANGE[partition_change Section]
+VERSION --> REPLICATION[replication Section]
 PARTITIONS --> DAILY[daily: model lists]
 PARTITIONS --> DAILY_CONFIG[daily_config: {include_current_day_partition}]
 PARTITIONS --> DYNAMIC[dynamic: partition definitions]
-JOBS --> JOB1[job_name: {models, include_upstream, partitions}]
-ASSET_JOBS --> ASSET_LIST[Model names as strings]
-SCHEDULES --> SCHEDULE1[schedule_name: {type, job_name, hour, minute, lookback_days, offset_days, enabled}]
-PARTITION_CHANGE --> DETECTORS1[detectors: sensor configurations]
-PARTITION_CHANGE --> PROPAGATORS1[propagators: downstream triggers]
+REPLICATION --> ENABLED[enabled: boolean]
+REPLICATION --> SCHEDULES_ENABLED[schedules: {enabled: boolean}]
+REPLICATION --> ENTRIES[entries: list of replication configs]
+REPL_ENTRIES --> ENTRY1[{model, destination_table, destination_schema, write_disposition, partition_column, primary_key}]
 ```
 
 **Diagram sources**
 - [dagsterization.yml:1-50](file://src/dbt_dagsterizer/project_templates/luban-dagster-dbt-starrocks-code-location-source-template/{{cookiecutter.output_name}}/dbt_project/dagsterization.yml#L1-L50)
-- [dagsterization-yml.md:27-56](file://docs/concepts/dagsterization-yml.md#L27-L56)
+- [dagsterization-yml.md:27-60](file://docs/concepts/dagsterization-yml.md#L27-L60)
 
 ### Partition Types and Constraints
 The system supports three primary partition types with strict isolation requirements:
@@ -130,7 +159,7 @@ The system supports three primary partition types with strict isolation requirem
 
 ## Architecture Overview
 
-The Dagsterization YAML Configuration system implements a multi-layered architecture that transforms declarative configuration into executable Dagster orchestration:
+The Dagsterization YAML Configuration system implements a multi-layered architecture that transforms declarative configuration into executable Dagster orchestration with enhanced replication capabilities:
 
 ```mermaid
 sequenceDiagram
@@ -138,6 +167,8 @@ participant User as User
 participant YAML as dagsterization.yml
 participant Loader as orchestration_config.py
 participant Validator as validation.py
+participant Replication as Replication System
+participant Timezone as timezone Field
 participant EndOffset as include_current_day_partition
 participant Factory as job_factory.py
 participant Runtime as Dagster Runtime
@@ -145,12 +176,19 @@ User->>YAML : Edit configuration
 YAML->>Loader : Load YAML file
 Loader->>Validator : Validate structure
 Validator->>Validator : Check partition types
+Validator->>Replication : Validate replication config
+Replication->>Replication : Check write dispositions
+Replication->>Replication : Validate partition columns
+Validator->>Timezone : Validate timezone format
+Timezone->>Timezone : Check IANA timezone name
 Validator->>EndOffset : Validate daily_config
 EndOffset->>EndOffset : Parse boolean flag
 Validator->>Validator : Validate job references
+Validator->>Validator : Validate replication entries
+Validator->>Validator : Check partition-aware replication
 Validator->>Factory : Generate specs
 Factory->>Runtime : Create jobs/schedules/sensors
-Runtime->>Runtime : Execute orchestration
+Runtime->>Runtime : Execute orchestration with timezone context
 ```
 
 **Diagram sources**
@@ -162,7 +200,7 @@ Runtime->>Runtime : Execute orchestration
 ## Detailed Component Analysis
 
 ### Orchestration Configuration Loading
-The configuration loading system provides robust YAML parsing with default value handling:
+The configuration loading system provides robust YAML parsing with default value handling and enhanced timezone support:
 
 ```mermaid
 classDiagram
@@ -173,10 +211,21 @@ class OrchestrationIndex {
 +dict~str,str~ group_job_by_model
 +bool daily_include_current_day_partition
 +string timezone
++bool replication_enabled
++dict~str,ReplicationEntry~ replication_entries
 }
 class DynamicPartitionConfig {
 +string name
 +string[] initial_partition_keys
+}
+class ReplicationEntry {
++string model
++bool enabled
++string destination_table
++string destination_schema
++string write_disposition
++string partition_column
++string primary_key
 }
 class OrchestrationConfig {
 +load_or_create(path) MutableMapping
@@ -184,9 +233,11 @@ class OrchestrationConfig {
 +set_partition(data, model, partition)
 +set_group_job(data, job_name, models, include_upstream, partitions)
 +set_daily_config(data, include_current_day_partition)
++set_timezone(data, timezone)
 }
 OrchestrationConfig --> OrchestrationIndex : creates
 OrchestrationIndex --> DynamicPartitionConfig : contains
+OrchestrationIndex --> ReplicationEntry : contains
 ```
 
 **Diagram sources**
@@ -194,7 +245,7 @@ OrchestrationIndex --> DynamicPartitionConfig : contains
 - [orchestration_config.py:1-16](file://src/dbt_dagsterizer/orchestration_config.py#L1-L16)
 
 ### Validation System
-The validation system enforces configuration integrity through comprehensive checks:
+The validation system enforces configuration integrity through comprehensive checks including enhanced timezone validation:
 
 ```mermaid
 flowchart TD
@@ -202,15 +253,28 @@ START[Configuration Load] --> STRUCT[Structure Validation]
 STRUCT --> PARTITION[Partition Validation]
 PARTITION --> DAILY_CONFIG[Daily Config Validation]
 DAILY_CONFIG --> BOOLEAN_CHECK[Check Boolean Type]
-BOOLEAN_CHECK --> JOB[Job Validation]
+BOOLEAN_CHECK --> TIMEZONE[Timezone Validation]
+TIMEZONE --> TIMEZONE_FORMAT[Check IANA Format]
+TIMEZONE_FORMAT --> REPLICATION[Replication Validation]
+REPLICATION --> WRITE_DISPOSITION[Write Disposition Validation]
+WRITE_DISPOSITION --> APPEND_CHECK[Check 'append']
+WRITE_DISPOSITION --> REPLACE_CHECK[Check 'replace']
+WRITE_DISPOSITION --> MERGE_CHECK[Check 'merge']
+REPLICATION --> PARTITION_COLUMN[Partition Column Validation]
+PARTITION_COLUMN --> STRING_CHECK[Check String Type]
+PARTITION_COLUMN --> NON_EMPTY_CHECK[Check Non-Empty]
+PARTITION_COLUMN --> MODEL_CHECK[Check Model Exists]
+JOB[Job Validation]
 JOB --> SCHEDULE[Schedule Validation]
 SCHEDULE --> SENSOR[Sensor Validation]
 SENSOR --> COMPLETE[Validation Complete]
 PARTITION --> |Invalid| ERROR1[Error: Invalid partition type]
 DAILY_CONFIG --> |Invalid| ERROR2[Error: Invalid daily_config type]
-JOB --> |Invalid| ERROR3[Error: Missing models]
-SCHEDULE --> |Invalid| ERROR4[Error: Invalid schedule config]
-SENSOR --> |Invalid| ERROR5[Error: Missing relations]
+TIMEZONE --> |Invalid| ERROR3[Error: Invalid timezone format]
+REPLICATION --> |Invalid| ERROR4[Error: Invalid replication config]
+WRITE_DISPOSITION --> |Invalid| ERROR5[Error: Invalid write_disposition]
+PARTITION_COLUMN --> |Invalid| ERROR6[Error: Invalid partition_column]
+MODEL_CHECK --> |Invalid| ERROR7[Error: Missing model reference]
 ```
 
 **Diagram sources**
@@ -323,6 +387,135 @@ EXTRACT --> TRIGGER[Trigger Downstream Jobs]
 - [factory.py:85-195](file://src/dbt_dagsterizer/sensors/partition_change/detector/factory.py#L85-L195)
 - [factory.py:42-142](file://src/dbt_dagsterizer/sensors/partition_change/propagator/factory.py#L42-L142)
 
+## Replication System
+
+### Replication Configuration Structure
+The replication system extends the configuration with a dedicated section for StarRocks-to-SQL Server data movement:
+
+```mermaid
+flowchart TD
+REPLICATION[replication Section] --> ENABLED[enabled: boolean]
+REPLICATION --> SCHEDULES[Schedules Section]
+REPLICATION --> ENTRIES[entries: list]
+SCHEDULES --> SCHEDULES_ENABLED[enabled: boolean]
+ENTRIES --> ENTRY[Individual Entry]
+ENTRY --> MODEL[model: string]
+ENTRY --> DEST_TABLE[destination_table: string]
+ENTRY --> DEST_SCHEMA[destination_schema: string]
+ENTRY --> WRITE_DISPOSITION[write_disposition: string]
+ENTRY --> PARTITION_COLUMN[partition_column: string]
+ENTRY --> PRIMARY_KEY[primary_key: string]
+ENTRY --> ENABLED_FLAG[enabled: boolean]
+```
+
+**Diagram sources**
+- [orchestration_config.py:19-28](file://src/dbt_dagsterizer/orchestration_config.py#L19-L28)
+
+### Write Dispositions and Behavior
+The replication system supports three write dispositions with distinct behaviors:
+
+| Write Disposition | Behavior | Partition-Aware | Use Case |
+|---|---|---|---|
+| `append` | Append new rows without modification | ❌ | Incremental loads, audit trails |
+| `replace` | Replace entire table or partition | ✅ | Full refresh scenarios |
+| `merge` | Merge based on primary key | ✅ | Upsert operations, slowly changing dimensions |
+
+**Section sources**
+- [validation.py:243-249](file://src/dbt_dagsterizer/cli_parts/validation.py#L243-L249)
+
+### Partition-Aware Replication
+The replication system respects dbt model partitioning strategies:
+
+```mermaid
+flowchart TD
+MODEL[dbt Model Partition] --> TYPE{Partition Type}
+TYPE --> |daily| DAILY_PARTITION[daily partitions]
+TYPE --> |dynamic| DYNAMIC_PARTITION[dynamic partitions]
+TYPE --> |unpartitioned| UNPARTITIONED[no partitions]
+DAILY_PARTITION --> REPLICATE[Replicate by date]
+DYNAMIC_PARTITION --> REPLICATE[Replicate by key]
+UNPARTITIONED --> REPLICATE[Full table copy]
+REPLICATE --> WRITE_DISPOSITION[Apply write disposition]
+WRITE_DISPOSITION --> EFFECTIVE[Effective disposition]
+EFFECTIVE --> EXECUTE[Execute replication]
+```
+
+**Diagram sources**
+- [executor.py:92-102](file://src/dbt_dagsterizer/assets/replication/executor.py#L92-L102)
+- [factory.py:69-74](file://src/dbt_dagsterizer/assets/replication/factory.py#L69-L74)
+
+### Resource Management
+The system manages connections to both source and destination databases:
+
+```mermaid
+flowchart TD
+STARROCKS[StarRocks Client] --> CONNECTION[MySQL Protocol]
+CONNECTION --> QUERY[SQL Queries]
+QUERY --> DATA[Extracted Data]
+DATA --> TRANSFORM[Transform Data]
+TRANSFORM --> SQL_SERVER[SQL Server Client]
+SQL_SERVER --> CONNECTION_STRING[Connection String]
+CONNECTION_STRING --> INSERT[Insert Data]
+INSERT --> DESTINATION[Destination Table]
+```
+
+**Diagram sources**
+- [starrocks.py:9-16](file://src/dbt_dagsterizer/resources/starrocks.py#L9-L16)
+- [mssql.py:7-17](file://src/dbt_dagsterizer/resources/mssql.py#L7-L17)
+- [executor.py:62-87](file://src/dbt_dagsterizer/assets/replication/executor.py#L62-L87)
+
+**Section sources**
+- [starrocks.py:9-16](file://src/dbt_dagsterizer/resources/starrocks.py#L9-L16)
+- [mssql.py:7-17](file://src/dbt_dagsterizer/resources/mssql.py#L7-L17)
+- [executor.py:62-87](file://src/dbt_dagsterizer/assets/replication/executor.py#L62-L87)
+
+### Practical Usage Scenarios
+Common use cases for the replication system:
+
+1. **Analytics Workloads**: Move processed dbt models to SQL Server for business intelligence tools
+2. **Data Warehousing**: Create mirror copies of StarRocks tables in SQL Server for reporting
+3. **Legacy System Integration**: Provide SQL Server access for existing applications requiring ODBC connectivity
+4. **Hybrid Architectures**: Support mixed database environments with specialized workloads
+
+**Section sources**
+- [auto_config.py:25-79](file://src/dbt_dagsterizer/assets/replication/auto_config.py#L25-L79)
+- [executor.py:18-102](file://src/dbt_dagsterizer/assets/replication/executor.py#L18-L102)
+
+## Timezone Configuration
+
+### Global Timezone Support
+The system now provides comprehensive timezone configuration capabilities for global schedule execution:
+
+```mermaid
+flowchart TD
+TIMEZONE[Top-level timezone Field] --> GLOBAL[Global Schedule Execution Timezone]
+GLOBAL --> SCHEDULES[All Schedules]
+SCHEDULES --> TIMEZONE_CHECK[Validate IANA Format]
+TIMEZONE_CHECK --> VALID_TIMEZONE[Valid IANA Timezone]
+VALID_TIMEZONE --> EXECUTION[Schedule Execution Context]
+EXECUTION --> PARTITION_EVALUATION[Partition Evaluation]
+PARTITION_EVALUATION --> CORRECT_TIMING[Correct Partition Timing]
+```
+
+**Diagram sources**
+- [dagsterization-yml.md:64-91](file://docs/concepts/dagsterization-yml.md#L64-L91)
+- [validation.py:273-278](file://src/dbt_dagsterizer/cli_parts/validation.py#L273-L278)
+
+### Timezone Configuration Options
+The timezone field supports all standard IANA timezone names:
+
+| Timezone | Description | Example |
+|---|---|---|
+| `UTC` | Coordinated Universal Time | `UTC` |
+| `America/New_York` | Eastern Time (US) | `America/New_York` |
+| `Europe/London` | Greenwich Mean Time | `Europe/London` |
+| `Asia/Tokyo` | Japan Standard Time | `Asia/Tokyo` |
+| `Australia/Sydney` | Australian Eastern Time | `Australia/Sydney` |
+
+**Section sources**
+- [dagsterization-yml.md:64-91](file://docs/concepts/dagsterization-yml.md#L64-L91)
+- [validation.py:273-278](file://src/dbt_dagsterizer/cli_parts/validation.py#L273-L278)
+
 ## Dependency Analysis
 
 The configuration system exhibits clear separation of concerns with well-defined dependencies:
@@ -333,6 +526,8 @@ subgraph "Configuration Dependencies"
 DAGSTERIZATION[dagsterization.yml] --> ORCHESTRATION_CONFIG[orchestration_config.py]
 ORCHESTRATION_CONFIG --> VALIDATION[validation.py]
 ORCHESTRATION_CONFIG --> PARTITIONS[partitions.py]
+ORCHESTRATION_CONFIG --> REPLICATION_ENTRY[ReplicationEntry]
+ORCHESTRATION_CONFIG --> TIMEZONE[set_timezone Function]
 END_OFFSET[include_current_day_partition] --> PARTITIONS
 end
 subgraph "Runtime Dependencies"
@@ -350,12 +545,28 @@ PARTITIONS --> DAILY_PARTITIONS_DEF[DailyPartitionsDefinition]
 DAILY_PARTITIONS_DEF --> END_OFFSET
 END_OFFSET --> DAGSTER_RUNTIME[Dagster Runtime]
 end
+subgraph "Replication Dependencies"
+REPLICATION_ENTRY --> AUTO_CONFIG[assets/replication/auto_config.py]
+AUTO_CONFIG --> EXECUTOR[assets/replication/executor.py]
+EXECUTOR --> STARROCKS_CLIENT[resources/starrocks.py]
+EXECUTOR --> MSSQL_CLIENT[resources/mssql.py]
+EXECUTOR --> DAGSTER_ASSETS[dagster assets]
+REPLICATION_SCHEDULES --> REPLICATION_JOBS[jobs/replication/factory.py]
+REPLICATION_JOBS --> REPLICATION_SCHEDULES_FACTORY[schedules/replication/factory.py]
+end
+subgraph "Timezone Dependencies"
+TIMEZONE --> VALIDATION
+VALIDATION --> SCHEDULES_FACTORY
+SCHEDULES_FACTORY --> DAGSTER_RUNTIME
+end
 ```
 
 **Diagram sources**
 - [orchestration_config.py:1-91](file://src/dbt_dagsterizer/orchestration_config.py#L1-L91)
 - [validation.py:1-200](file://src/dbt_dagsterizer/cli_parts/validation.py#L1-L200)
 - [partitions.py:10-30](file://src/dbt_dagsterizer/partitions.py#L10-L30)
+- [auto_config.py:1-79](file://src/dbt_dagsterizer/assets/replication/auto_config.py#L1-L79)
+- [executor.py:18-102](file://src/dbt_dagsterizer/assets/replication/executor.py#L18-L102)
 
 **Section sources**
 - [orchestration_config.py:1-91](file://src/dbt_dagsterizer/orchestration_config.py#L1-L91)
@@ -369,6 +580,10 @@ The configuration system is designed for optimal performance through several mec
 - **Efficient Validation**: Validation occurs only when configuration changes
 - **Minimal Memory Footprint**: Configuration is parsed once and reused across components
 - **Boolean Flag Optimization**: The `include_current_day_partition` option is processed as a simple boolean flag without additional overhead
+- **Resource Pooling**: Database connections are managed efficiently through client classes
+- **Partition Pruning**: Replication respects model partitioning to minimize data transfer
+- **Timezone Caching**: Timezone validation results are cached for improved performance
+- **Optional Scheduling**: Replication schedules are optional and disabled by default to reduce overhead
 
 ## Troubleshooting Guide
 
@@ -394,12 +609,30 @@ The configuration system is designed for optimal performance through several mec
 - **Cause**: Non-boolean value or malformed daily_config structure
 - **Solution**: Ensure `include_current_day_partition` is a boolean value and `daily_config` is a mapping
 
+**Replication Configuration Errors**
+- **Symptom**: Validation errors for replication entries
+- **Cause**: Invalid write_disposition values, missing partition columns for partitioned models, or invalid model references
+- **Solution**: Verify write_disposition is one of 'append', 'replace', or 'merge'; ensure partition_column is specified for partitioned models; confirm model exists in dbt project
+
+**Timezone Configuration Errors**
+- **Symptom**: Validation errors for timezone field
+- **Cause**: Invalid IANA timezone name or empty string
+- **Solution**: Use valid IANA timezone names (e.g., 'UTC', 'America/New_York', 'Europe/London')
+
+**Database Connection Issues**
+- **Symptom**: Connection errors to StarRocks or SQL Server
+- **Cause**: Incorrect credentials, network connectivity, or driver issues
+- **Solution**: Verify environment variables for STARROCKS_* and SQLSERVER_*; check network connectivity; ensure appropriate drivers are installed
+
 **Section sources**
-- [dagsterization-yml.md:654-707](file://docs/concepts/dagsterization-yml.md#L654-L707)
+- [dagsterization-yml.md:654-864](file://docs/concepts/dagsterization-yml.md#L654-L864)
+- [validation.py:243-249](file://src/dbt_dagsterizer/cli_parts/validation.py#L243-L249)
 
 ## Conclusion
 The Dagsterization YAML Configuration system provides a robust, declarative approach to orchestrating dbt models in Dagster. Through careful separation of concerns, comprehensive validation, and flexible partitioning strategies, it enables teams to manage complex orchestration requirements while maintaining simplicity and reliability.
 
-**Updated** The addition of the `include_current_day_partition` option in the `partitions.daily_config` section enhances the system's flexibility by providing precise control over daily partition availability. This feature allows teams to configure whether today's partition should be available in the DailyPartitionsDefinition, enabling same-day processing scenarios when needed.
+**Updated** The addition of the StarRocks-to-Microsoft SQL Server replication system significantly enhances the platform's versatility by enabling downstream SQL Server access for dbt-dagsterizer users. The replication system supports three write dispositions (append, replace, merge) with partition-aware behavior, integrates seamlessly with existing orchestration configuration, and provides practical solutions for analytics workloads, legacy system integration, and hybrid database architectures.
 
-The system's modular architecture allows for easy extension and customization while preserving backward compatibility and providing clear error messages for troubleshooting. The new daily partition configuration feature maintains consistency with the existing configuration structure and validation patterns, ensuring seamless integration into the overall orchestration framework.
+The system's modular architecture allows for easy extension and customization while preserving backward compatibility and providing clear error messages for troubleshooting. The new replication feature maintains consistency with the existing configuration structure and validation patterns, ensuring seamless integration into the overall orchestration framework while opening new possibilities for data movement and downstream system access.
+
+The enhanced timezone configuration capabilities further strengthen the system's internationalization support, enabling precise schedule execution across different geographic regions and time zones. This combination of replication capabilities and timezone support makes dbt-dagsterizer a comprehensive solution for modern data orchestration needs.

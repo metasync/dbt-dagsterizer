@@ -10,15 +10,18 @@
 - [macros.py](file://src/dbt_dagsterizer/cli_parts/macros.py)
 - [validation.py](file://src/dbt_dagsterizer/cli_parts/validation.py)
 - [common.py](file://src/dbt_dagsterizer/cli_parts/common.py)
+- [orchestration_config.py](file://src/dbt_dagsterizer/orchestration_config.py)
 - [cli.md](file://docs/concepts/cli.md)
 - [pyproject.toml](file://pyproject.toml)
 </cite>
 
 ## Update Summary
 **Changes Made**
-- Added comprehensive documentation for the new --local-dbt-dagsterizer-path option in project initialization
-- Documented dependency modes and mutual exclusivity constraints with existing version options
-- Updated project init command documentation with new validation logic and error handling
+- Added comprehensive documentation for the new meta timezone command for setting global schedule execution timezone
+- Added comprehensive documentation for the new meta replication entry command for configuring StarRocks-to-SQL Server replication
+- Updated meta group documentation to include new replication and timezone commands
+- Added practical examples for replication configuration and timezone settings
+- Updated architecture diagrams to reflect new replication functionality
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -59,7 +62,7 @@ F["Module Entrypoint<br/>src/dbt_dagsterizer/__main__.py"] --> A
 - [__main__.py:1-5](file://src/dbt_dagsterizer/__main__.py#L1-L5)
 - [app.py:19-29](file://src/dbt_dagsterizer/cli_parts/app.py#L19-L29)
 - [project.py:106-307](file://src/dbt_dagsterizer/cli_parts/project.py#L106-L307)
-- [meta.py:56-627](file://src/dbt_dagsterizer/cli_parts/meta.py#L56-L627)
+- [meta.py:603-773](file://src/dbt_dagsterizer/cli_parts/meta.py#L603-L773)
 - [macros.py:67-84](file://src/dbt_dagsterizer/cli_parts/macros.py#L67-L84)
 
 **Section sources**
@@ -83,6 +86,8 @@ F["Module Entrypoint<br/>src/dbt_dagsterizer/__main__.py"] --> A
   - meta schedule
   - meta partition-change detector
   - meta partition-change propagator
+  - meta replication entry
+  - meta timezone
   - meta validate
 - macros group
   - macros sync
@@ -92,40 +97,44 @@ Environment and configuration highlights:
 - Cookiecutter required for project init
 - Dotenv loading behavior for dbt parse
 - Manifest preparation and caching via sidecar inputs
+- Replication configuration for StarRocks-to-SQL Server data pipeline
 
 **Section sources**
 - [app.py:19-29](file://src/dbt_dagsterizer/cli_parts/app.py#L19-L29)
 - [project.py:106-307](file://src/dbt_dagsterizer/cli_parts/project.py#L106-L307)
-- [meta.py:56-627](file://src/dbt_dagsterizer/cli_parts/meta.py#L56-L627)
+- [meta.py:603-773](file://src/dbt_dagsterizer/cli_parts/meta.py#L603-L773)
 - [macros.py:67-84](file://src/dbt_dagsterizer/cli_parts/macros.py#L67-L84)
 - [cli.md:36-52](file://docs/concepts/cli.md#L36-L52)
 
 ## Architecture Overview
-The CLI composes Click groups and commands, delegating to shared helpers for path resolution, model selection, and validation. The meta group orchestrates orchestration file updates and optionally triggers dbt parse to refresh manifests. The project group renders cookiecutter templates and generates GitOps artifacts.
+The CLI composes Click groups and commands, delegating to shared helpers for path resolution, model selection, and validation. The meta group orchestrates orchestration file updates and optionally triggers dbt parse to refresh manifests. The project group renders cookiecutter templates and generates GitOps artifacts. The replication functionality integrates with the orchestration configuration system to manage StarRocks-to-SQL Server data replication.
 
 ```mermaid
 graph TB
 subgraph "CLI Groups"
 PG["project<br/>list-templates/init/gen-gitops-env"]
-MG["meta<br/>init/job/job-delete/partition/asset-job/asset-job-delete/schedule/partition-change/validate"]
+MG["meta<br/>init/job/job-delete/partition/asset-job/asset-job-delete/schedule/partition-change/replication/timezone/validate"]
 MC["macros<br/>sync"]
 end
 subgraph "Shared Utilities"
 CMN["common.py<br/>resolve_dir_arg, split_csv, orchestration_path, select_models"]
 VAL["validation.py<br/>validate_* and save_orchestration_with_validation"]
+ORCH["orchestration_config.py<br/>ReplicationEntry, set_timezone, set_replication_entry"]
 end
 PG --> CMN
 MG --> CMN
 MG --> VAL
+MG --> ORCH
 MC --> CMN
 ```
 
 **Diagram sources**
 - [project.py:106-307](file://src/dbt_dagsterizer/cli_parts/project.py#L106-L307)
-- [meta.py:56-627](file://src/dbt_dagsterizer/cli_parts/meta.py#L56-L627)
+- [meta.py:603-773](file://src/dbt_dagsterizer/cli_parts/meta.py#L603-L773)
 - [macros.py:67-84](file://src/dbt_dagsterizer/cli_parts/macros.py#L67-L84)
 - [common.py:11-63](file://src/dbt_dagsterizer/cli_parts/common.py#L11-L63)
 - [validation.py:22-310](file://src/dbt_dagsterizer/cli_parts/validation.py#L22-L310)
+- [orchestration_config.py:18-28](file://src/dbt_dagsterizer/orchestration_config.py#L18-L28)
 
 ## Detailed Component Analysis
 
@@ -349,6 +358,45 @@ MC --> CMN
     - Validates targets list and interval.
     - Sets propagator entries.
 
+- meta replication entry
+  - Purpose: Configure a StarRocks-to-SQL Server replication entry.
+  - Options:
+    - --dbt-project-dir: dbt project directory (default ./dbt_project)
+    - --path: orchestration file path (default dagsterization.yml)
+    - --model: dbt model name to replicate (required)
+    - --enabled: enable/disable replication (default: true)
+    - --destination-table: target table in SQL Server (default: model name)
+    - --destination-schema: target schema in SQL Server (default: dbo)
+    - --write-disposition: append | replace | merge (default: replace)
+    - --partition-column: column for partition-aware replication (required for partitioned models)
+    - --prepare: prepare manifest when using --tag
+    - --parse: run dbt parse after writing
+  - Behavior:
+    - Ensures replication is enabled in the orchestration file
+    - Creates/updates replication entry with destination configuration
+    - Validates write disposition and partition column requirements
+    - Automatically sets destination schema to "dbo" if not specified
+  - Error conditions:
+    - Invalid write disposition (must be append, replace, or merge)
+    - Empty model name
+    - Missing partition column for partitioned models
+    - Invalid destination table or schema names
+
+- meta timezone
+  - Purpose: Set the global schedule execution timezone.
+  - Options:
+    - --dbt-project-dir: dbt project directory (default ./dbt_project)
+    - --path: orchestration file path (default dagsterization.yml)
+    - --timezone: IANA timezone name (required, e.g., UTC, Asia/Shanghai)
+    - --prepare: prepare manifest when using --tag
+  - Behavior:
+    - Sets the global timezone for all schedules in the orchestration file
+    - Validates timezone format against IANA timezone database
+    - Persists timezone setting for consistent schedule execution across environments
+  - Error conditions:
+    - Empty timezone string
+    - Invalid IANA timezone name
+
 - meta validate
   - Purpose: Validate the orchestration file against the manifest.
   - Options:
@@ -361,9 +409,12 @@ MC --> CMN
     - Emits warnings and errors; exits with failure if errors exist.
 
 **Section sources**
-- [meta.py:56-627](file://src/dbt_dagsterizer/cli_parts/meta.py#L56-L627)
+- [meta.py:603-773](file://src/dbt_dagsterizer/cli_parts/meta.py#L603-L773)
 - [validation.py:22-310](file://src/dbt_dagsterizer/cli_parts/validation.py#L22-L310)
 - [common.py:11-63](file://src/dbt_dagsterizer/cli_parts/common.py#L11-L63)
+- [orchestration_config.py:18-28](file://src/dbt_dagsterizer/orchestration_config.py#L18-L28)
+- [orchestration_config.py:285-296](file://src/dbt_dagsterizer/orchestration_config.py#L285-L296)
+- [orchestration_config.py:580-616](file://src/dbt_dagsterizer/orchestration_config.py#L580-L616)
 - [cli.md:119-310](file://docs/concepts/cli.md#L119-L310)
 
 ### macros group
@@ -386,6 +437,7 @@ MC --> CMN
 - Entry point script maps dbt-dagsterizer to the CLI module.
 - The CLI depends on shared utilities for path resolution and model selection.
 - Validation integrates with dbt manifest loading and orchestration indexing.
+- Replication functionality integrates with orchestration configuration system.
 
 ```mermaid
 graph TB
@@ -397,6 +449,7 @@ APP --> MG["meta group"]
 APP --> MC["macros group"]
 MG --> VAL["validation.py"]
 MG --> CMN["common.py"]
+MG --> ORCH["orchestration_config.py"]
 PG --> CMN
 MC --> CMN
 ```
@@ -405,9 +458,10 @@ MC --> CMN
 - [pyproject.toml:30-32](file://pyproject.toml#L30-L32)
 - [cli.py:1-7](file://src/dbt_dagsterizer/cli.py#L1-L7)
 - [app.py:19-29](file://src/dbt_dagsterizer/cli_parts/app.py#L19-L29)
-- [meta.py:56-627](file://src/dbt_dagsterizer/cli_parts/meta.py#L56-L627)
+- [meta.py:603-773](file://src/dbt_dagsterizer/cli_parts/meta.py#L603-L773)
 - [validation.py:22-310](file://src/dbt_dagsterizer/cli_parts/validation.py#L22-L310)
 - [common.py:11-63](file://src/dbt_dagsterizer/cli_parts/common.py#L11-L63)
+- [orchestration_config.py:18-28](file://src/dbt_dagsterizer/orchestration_config.py#L18-L28)
 
 **Section sources**
 - [pyproject.toml:1-50](file://pyproject.toml#L1-L50)
@@ -419,6 +473,7 @@ MC --> CMN
 - Using --tag requires manifest loading; batch operations where possible to avoid repeated parsing.
 - Macros sync copies files; --force may overwrite existing files.
 - Local dbt-dagsterizer path validation performs filesystem checks and TOML parsing during project initialization.
+- Replication configuration updates are lightweight and only modify the orchestration file structure.
 
 ## Troubleshooting Guide
 Common issues and resolutions:
@@ -446,6 +501,15 @@ Common issues and resolutions:
 - Validation failures
   - Symptom: Errors reported and process exits with failure.
   - Resolution: Fix references to missing models and conform to structural constraints.
+- Invalid replication write disposition
+  - Symptom: Failure when using unsupported write disposition (append, replace, merge).
+  - Resolution: Use one of the supported values: append, replace, or merge.
+- Missing partition column for partitioned models
+  - Symptom: Failure when replication entry references a partitioned model without partition_column.
+  - Resolution: Specify the partition_column for partitioned models.
+- Invalid timezone format
+  - Symptom: Failure when timezone is not a valid IANA timezone name.
+  - Resolution: Use a valid IANA timezone identifier (e.g., UTC, America/New_York, Asia/Tokyo).
 
 **Section sources**
 - [project.py:187-259](file://src/dbt_dagsterizer/cli_parts/project.py#L187-L259)
@@ -459,10 +523,12 @@ Common issues and resolutions:
 - [meta.py:453-512](file://src/dbt_dagsterizer/cli_parts/meta.py#L453-L512)
 - [meta.py:561-582](file://src/dbt_dagsterizer/cli_parts/meta.py#L561-L582)
 - [meta.py:588-624](file://src/dbt_dagsterizer/cli_parts/meta.py#L588-L624)
+- [meta.py:608-670](file://src/dbt_dagsterizer/cli_parts/meta.py#L608-L670)
+- [meta.py:745-770](file://src/dbt_dagsterizer/cli_parts/meta.py#L745-L770)
 - [validation.py:275-310](file://src/dbt_dagsterizer/cli_parts/validation.py#L275-L310)
 
 ## Conclusion
-The dbt-dagsterizer CLI provides a cohesive workflow for initializing projects, managing orchestration intent in a dedicated YAML file, and synchronizing template-managed macros. It validates early to prevent runtime issues and integrates with dbt manifest preparation. The new --local-dbt-dagsterizer-path option enables flexible dependency management for development workflows. Use the examples and guidance here to adopt the CLI effectively in local development and CI/CD pipelines.
+The dbt-dagsterizer CLI provides a cohesive workflow for initializing projects, managing orchestration intent in a dedicated YAML file, and synchronizing template-managed macros. It validates early to prevent runtime issues and integrates with dbt manifest preparation. The new --local-dbt-dagsterizer-path option enables flexible dependency management for development workflows. The addition of replication and timezone management capabilities extends the CLI's utility for modern data pipeline architectures, particularly for StarRocks-to-SQL Server replication scenarios. Use the examples and guidance here to adopt the CLI effectively in local development and CI/CD pipelines.
 
 ## Appendices
 
@@ -495,6 +561,8 @@ The dbt-dagsterizer CLI provides a cohesive workflow for initializing projects, 
   - Delete grouped job: dbt-dagsterizer meta job-delete --name daily_facts_job
   - Configure detector: dbt-dagsterizer meta partition-change detector --model orders --enabled --detect-source ods.orders --partition-date-expr order_date --updated-at-expr updated_at --lookback-days 7 --offset-days 1
   - Configure propagator: dbt-dagsterizer meta partition-change propagator --model orders --enabled --targets daily_facts_job
+  - Set global timezone: dbt-dagsterizer meta timezone --timezone "America/New_York"
+  - Configure replication entry: dbt-dagsterizer meta replication entry --model orders --destination-table orders --destination-schema staging --write-disposition replace --partition-column order_date
   - Validate: dbt-dagsterizer meta validate --prepare
 - Macro synchronization
   - Sync macros: dbt-dagsterizer macros sync
@@ -510,8 +578,12 @@ The dbt-dagsterizer CLI provides a cohesive workflow for initializing projects, 
 - Generate GitOps artifacts with project gen-gitops-env and commit outputs to your GitOps repository.
 - Use --local-dbt-dagsterizer-path for development workflows to test against local changes.
 - Implement dependency mode selection based on environment: local path for development, pinned version for production, no pin for flexibility.
+- Configure replication entries for StarRocks-to-SQL Server data pipelines with appropriate write dispositions and partition columns.
+- Set global timezone to ensure consistent schedule execution across different environments and timezones.
 
 **Section sources**
 - [cli.md:300-310](file://docs/concepts/cli.md#L300-L310)
 - [project.py:280-304](file://src/dbt_dagsterizer/cli_parts/project.py#L280-L304)
 - [project.py:242-276](file://src/dbt_dagsterizer/cli_parts/project.py#L242-L276)
+- [meta.py:608-670](file://src/dbt_dagsterizer/cli_parts/meta.py#L608-L670)
+- [meta.py:745-770](file://src/dbt_dagsterizer/cli_parts/meta.py#L745-L770)

@@ -67,16 +67,21 @@ class LubanDagsterDbtTranslator(DagsterDbtTranslator):
         tags = set(dbt_resource_props.get("tags", []))
         is_daily = bool(name) and self.partitions_by_model.get(
             str(name)) == "daily"
+        is_dynamic = bool(name) and self.partitions_by_model.get(
+            str(name), "").startswith("dynamic:")
 
         automation_tables = self.automation_observable_tables
 
-        if "dwd" in fqn and name in automation_tables:
+        # if "dwd" in fqn and name in automation_tables:
+        if name in automation_tables:
             return dg.AutomationCondition.eager()
 
-        if self._propagator_mode_is_eager() and "dws" in fqn and is_daily:
+        # if self._propagator_mode_is_eager() and "dws" in fqn and (is_daily or is_dynamic):
+        if self._propagator_mode_is_eager() and (is_daily or is_dynamic):
             return dg.AutomationCondition.eager()
 
-        if "dws" in fqn and "dim" in tags:
+        # if "dws" in fqn and "dim" in tags:
+        if "dim" in tags:
             return dg.AutomationCondition.eager()
 
         return None

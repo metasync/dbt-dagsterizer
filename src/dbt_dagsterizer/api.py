@@ -46,10 +46,11 @@ def build_definitions(
             def project_ready(_context) -> None:
                 return None
 
+            from .assets.version_info import build_version_info_asset
             from .resources import get_resources
 
             return Definitions(
-                assets=[project_ready],
+                assets=[build_version_info_asset(), project_ready],
                 jobs=[],
                 schedules=[],
                 sensors=[],

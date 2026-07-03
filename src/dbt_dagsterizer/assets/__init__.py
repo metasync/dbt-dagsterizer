@@ -3,6 +3,7 @@ def get_assets():
     from .replication import get_replication_assets
     from .sources.automation import load_automation_observable_sources
     from .sources.factory import build_observable_source_assets
+    from .version_info import build_version_info_asset
 
     dbt_assets = get_dbt_assets()
     observable_source_assets = build_observable_source_assets(
@@ -11,4 +12,9 @@ def get_assets():
     )
     replication_assets = get_replication_assets()
 
-    return (dbt_assets if isinstance(dbt_assets, list) else [dbt_assets]) + observable_source_assets + replication_assets
+    return (
+        [build_version_info_asset()]
+        + (dbt_assets if isinstance(dbt_assets, list) else [dbt_assets])
+        + observable_source_assets
+        + replication_assets
+    )

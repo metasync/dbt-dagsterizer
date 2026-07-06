@@ -1,5 +1,0 @@
-- Entry points: `build_definitions()` in `api.py` for runtime integration and a Click-based CLI in `cli.py` (subcommands: `meta`, `project`, `macros`) for bootstrapping and maintenance.
-- Core translation: `assets/dbt/translator.py` extends `DagsterDbtTranslator` to map dbt models to Dagster assets using physical relation keys (`dbt/<database>/<schema>/<identifier>`), applying automation conditions and partitioning based on `dagsterization.yml`.
-- Configuration management: `orchestration_config.py` handles loading, indexing, and mutating the `dagsterization.yml` file, which serves as the single source of truth for job grouping, partitioning, and change detection rules.
-- Dynamic generation: Factories in `jobs/`, `schedules/`, and `sensors/` packages dynamically construct Dagster definitions. Sensors include partition-change detectors (polling StarRocks watermarks) and propagators (triggering downstream jobs on upstream materializations).
-- Resource abstraction: `resources/` provides standardized `dbt` and `starrocks` resources, with Kubernetes run-pod environment injection handled via `k8s_tags.py` and env vars.

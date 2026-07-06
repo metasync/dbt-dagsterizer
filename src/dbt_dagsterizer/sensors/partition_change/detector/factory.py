@@ -8,6 +8,7 @@ import dagster as dg
 from ....assets.dbt.prepare import prepare_manifest_if_missing
 from ....jobs.dbt.jobs import get_dbt_jobs_by_name
 from .dbt_manifest import load_manifest
+from .dynamic import build_dynamic_partition_change_sensor
 from .sparse_lookback import (
     detect_partition_max_watermarks,
     expand_impacted_dates,
@@ -65,6 +66,10 @@ def build_dbt_partition_change_sensors(*, specs: list[dict]) -> list[dg.SensorDe
         default_status = dg.DefaultSensorStatus.RUNNING if enabled else dg.DefaultSensorStatus.STOPPED
 
         partition_type = spec.get("partition_type", "daily")
+        
+        if partition_type == "dynamic":
+            return build_dynamic_partition_change_sensor(spec, None)
+        
         if partition_type != "daily":
             raise ValueError(f"Unsupported partition_type: {partition_type}")
 

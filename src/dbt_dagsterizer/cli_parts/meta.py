@@ -30,6 +30,9 @@ from ..orchestration_config import (
     set_asset_job as orch_set_asset_job,
 )
 from ..orchestration_config import (
+    set_daily_config as orch_set_daily_config,
+)
+from ..orchestration_config import (
     set_partition as orch_set_partition,
 )
 from ..orchestration_config import (
@@ -40,6 +43,9 @@ from ..orchestration_config import (
 )
 from ..orchestration_config import (
     set_schedule as orch_set_schedule,
+)
+from ..orchestration_config import (
+    set_timezone as orch_set_timezone,
 )
 from .common import orchestration_path, resolve_dir_arg, select_models, split_csv
 from .validation import (
@@ -85,7 +91,7 @@ def build_meta_group() -> click.Group:
     @click.option("--tag", "tag_", default="", help="Select models by existing dbt tag")
     @click.option("--name", "job_name", required=True)
     @click.option("--include-upstream/--no-include-upstream", default=False, show_default=True)
-    @click.option("--partitions", default="", help="daily|unpartitioned|none")
+    @click.option("--partitions", default="", help="daily|unpartitioned|dynamic:name|none")
     @click.option("--prepare/--no-prepare", default=True, show_default=True)
     @click.option("--parse/--no-parse", default=False, show_default=True)
     def meta_job(
@@ -115,7 +121,9 @@ def build_meta_group() -> click.Group:
 
         partitions_value = partitions.strip().lower() or None
         if partitions_value is not None and partitions_value not in {"daily", "unpartitioned", "none"}:
-            raise click.ClickException("--partitions must be one of daily|unpartitioned|none")
+            # Check if it's a dynamic partition spec
+            if not partitions_value.startswith("dynamic:"):
+                raise click.ClickException("--partitions must be one of daily|unpartitioned|dynamic:name|none")
         job_partitions = None if partitions_value in {None, "none"} else partitions_value
 
         target = orchestration_path(dbt_project_dir=dbt_project_path, path_=path_)
@@ -223,7 +231,7 @@ def build_meta_group() -> click.Group:
     @click.option("--path", "path_", default="dagsterization.yml", show_default=True)
     @click.option("--models", default="", help="Comma-separated model names")
     @click.option("--tag", "tag_", default="", help="Select models by existing dbt tag")
-    @click.option("--type", "partition_type", required=True, help="daily|unpartitioned")
+    @click.option("--type", "partition_type", required=True, help="daily|unpartitioned|dynamic:name")
     @click.option("--prepare/--no-prepare", default=True, show_default=True)
     @click.option("--parse/--no-parse", default=False, show_default=True)
     def meta_partition(
@@ -235,8 +243,16 @@ def build_meta_group() -> click.Group:
         prepare: bool,
         parse: bool,
     ) -> None:
-        if partition_type not in {"daily", "unpartitioned"}:
-            raise click.ClickException("--type must be one of daily|unpartitioned")
+        # Handle dynamic partition type
+        if partition_type.startswith("dynamic:"):
+            dynamic_name = partition_type.split(":", 1)[1]
+            if not dynamic_name:
+                raise click.ClickException("dynamic partition name must be non-empty (use dynamic:name)")
+            partition_value = partition_type
+        elif partition_type not in {"daily", "unpartitioned"}:
+            raise click.ClickException("--type must be one of daily|unpartitioned|dynamic:name")
+        else:
+            partition_value = partition_type
 
         dbt_project_path = resolve_dir_arg(dbt_project_dir)
         if not dbt_project_path.exists():
@@ -255,7 +271,7 @@ def build_meta_group() -> click.Group:
         target = orchestration_path(dbt_project_dir=dbt_project_path, path_=path_)
         data = load_orch(target)
         for m in selected:
-            orch_set_partition(data=data, model=m, partition=partition_type)
+            orch_set_partition(data=data, model=m, partition=partition_value)
         save_orchestration_with_validation(target=target, data=data, dbt_project_dir=dbt_project_path, prepare=prepare)
         if parse:
             run_dbt_parse(dbt_project_dir=dbt_project_path, dbt_profiles_dir=dbt_project_path, dbt_target=_default_dbt_target())
@@ -622,5 +638,63 @@ def build_meta_group() -> click.Group:
         if errors:
             raise click.ClickException(f"Validation failed with {len(errors)} error(s)")
         click.echo("OK")
+
+    @meta.command("partition-config")
+    @click.option("--dbt-project-dir", default="./dbt_project", show_default=True)
+    @click.option("--path", "path_", default="dagsterization.yml", show_default=True)
+    @click.option(
+        "--include-current-day-partition/--no-include-current-day-partition",
+        default=None,
+        help="Include today's partition in DailyPartitionsDefinition",
+    )
+    @click.option("--prepare/--no-prepare", default=True, show_default=True)
+    def meta_partition_config(
+        dbt_project_dir: str,
+        path_: str,
+        include_current_day_partition: bool | None,
+        prepare: bool,
+    ) -> None:
+        """Configure daily partition definition parameters."""
+        dbt_project_path = resolve_dir_arg(dbt_project_dir)
+        if not dbt_project_path.exists():
+            raise click.ClickException(f"dbt project dir does not exist: {dbt_project_path}")
+
+        target = orchestration_path(dbt_project_dir=dbt_project_path, path_=path_)
+        data = load_orch(target)
+        orch_set_daily_config(data=data, include_current_day_partition=include_current_day_partition)
+        save_orchestration_with_validation(
+            target=target,
+            data=data,
+            dbt_project_dir=dbt_project_path,
+            prepare=prepare,
+        )
+        click.echo(str(target))
+
+    @meta.command("timezone")
+    @click.option("--dbt-project-dir", default="./dbt_project", show_default=True)
+    @click.option("--path", "path_", default="dagsterization.yml", show_default=True)
+    @click.option("--timezone", required=True, help="IANA timezone name (e.g. UTC, Asia/Shanghai)")
+    @click.option("--prepare/--no-prepare", default=True, show_default=True)
+    def meta_timezone(
+        dbt_project_dir: str,
+        path_: str,
+        timezone: str,
+        prepare: bool,
+    ) -> None:
+        """Set the global schedule execution timezone."""
+        dbt_project_path = resolve_dir_arg(dbt_project_dir)
+        if not dbt_project_path.exists():
+            raise click.ClickException(f"dbt project dir does not exist: {dbt_project_path}")
+
+        target = orchestration_path(dbt_project_dir=dbt_project_path, path_=path_)
+        data = load_orch(target)
+        orch_set_timezone(data=data, timezone=timezone)
+        save_orchestration_with_validation(
+            target=target,
+            data=data,
+            dbt_project_dir=dbt_project_path,
+            prepare=prepare,
+        )
+        click.echo(str(target))
 
     return meta

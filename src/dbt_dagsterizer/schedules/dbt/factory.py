@@ -18,12 +18,14 @@ def _build_daily_partitioned_schedule(
     partition_lookback_days: int,
     dedupe_across_ticks: bool,
     default_status: dg.DefaultScheduleStatus,
+    execution_timezone: str = "UTC",
 ):
     @dg.schedule(
         name=name,
         cron_schedule=cron_schedule,
         job=job,
         default_status=default_status,
+        execution_timezone=execution_timezone,
     )
     def _schedule(context):
         scheduled_time = context.scheduled_execution_time or datetime.now(timezone.utc)
@@ -48,7 +50,66 @@ def _build_daily_partitioned_schedule(
     return _schedule
 
 
-def build_dbt_schedules(schedule_specs, jobs_by_name):
+def _build_dynamic_partitioned_schedule(
+    *,
+    name: str,
+    cron_schedule: str,
+    job,
+    partition_keys: list[str],
+    dedupe_across_ticks: bool,
+    default_status: dg.DefaultScheduleStatus,
+    execution_timezone: str = "UTC",
+):
+    """Build a schedule for dynamic partitions.
+    
+    Emits RunRequests for all dynamic partition keys on each scheduled tick.
+    
+    Args:
+        name: Schedule name
+        cron_schedule: Cron expression for schedule timing
+        job: Dagster job to execute
+        partition_keys: List of partition keys to emit RunRequests for
+        dedupe_across_ticks: Whether to dedupe run keys across ticks
+        default_status: Initial schedule status
+        execution_timezone: IANA timezone name for schedule execution
+    
+    Returns:
+        A schedule definition function
+    """
+    @dg.schedule(
+        name=name,
+        cron_schedule=cron_schedule,
+        job=job,
+        default_status=default_status,
+        execution_timezone=execution_timezone,
+    )
+    def _schedule(context):
+        scheduled_time = context.scheduled_execution_time or datetime.now(timezone.utc)
+        run_requests = []
+        
+        for partition_key in partition_keys:
+            run_key = _with_optional_tick_suffix(
+                run_key=f"{name}:{partition_key}",
+                scheduled_time=scheduled_time,
+                dedupe_across_ticks=dedupe_across_ticks,
+            )
+            run_requests.append(
+                dg.RunRequest(
+                    partition_key=partition_key,
+                    run_key=run_key,
+                )
+            )
+        
+        return run_requests
+    
+    return _schedule
+
+
+def build_dbt_schedules(
+    schedule_specs,
+    jobs_by_name,
+    dynamic_partitions_defs: dict[str, dg.PartitionsDefinition] | None = None,
+):
     duplicated = set()
     seen = set()
     for spec in schedule_specs:
@@ -81,6 +142,7 @@ def build_dbt_schedules(schedule_specs, jobs_by_name):
 
             partition_offset_days = int(spec.get("partition_offset_days", 0))
             partition_lookback_days = int(spec.get("partition_lookback_days", 0))
+            execution_timezone = str(spec.get("timezone", "UTC") or "UTC").strip() or "UTC"
             schedules_by_name[spec["name"]] = _build_daily_partitioned_schedule(
                 name=spec["name"],
                 cron_schedule=spec["cron_schedule"],
@@ -89,6 +151,7 @@ def build_dbt_schedules(schedule_specs, jobs_by_name):
                 partition_lookback_days=partition_lookback_days,
                 dedupe_across_ticks=dedupe_across_ticks,
                 default_status=default_status,
+                execution_timezone=execution_timezone,
             )
             continue
 

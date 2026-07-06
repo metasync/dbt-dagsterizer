@@ -43,6 +43,7 @@ def get_sensors():
     import dagster as dg
 
     from ..jobs.dbt.jobs import get_dbt_jobs_by_name
+    from ..resources.dbt import get_dbt_project_dir
     from .dbt_config import PARTITION_CHANGE_DETECTION_SPECS, PARTITION_CHANGE_PROPAGATION_SPECS
     from .partition_change.auto_config import (
         build_auto_partition_change_detection_specs,
@@ -50,6 +51,7 @@ def get_sensors():
     )
     from .partition_change.detector.factory import build_dbt_partition_change_sensors
     from .partition_change.propagator.factory import build_partition_propagation_sensors
+    from .dynamic_partitions_bootstrap import build_dynamic_partitions_bootstrap_sensor
 
     automation_condition_sensor = dg.AutomationConditionSensorDefinition(
         "default_automation_condition_sensor",
@@ -58,6 +60,10 @@ def get_sensors():
     )
 
     sensors = [automation_condition_sensor]
+
+    # Add dynamic partitions bootstrap sensor
+    dbt_project_dir = get_dbt_project_dir()
+    sensors.append(build_dynamic_partitions_bootstrap_sensor(dbt_project_dir))
 
     sensors += build_dbt_partition_change_sensors(
         specs=build_auto_partition_change_detection_specs() + PARTITION_CHANGE_DETECTION_SPECS,

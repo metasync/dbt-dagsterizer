@@ -25,6 +25,7 @@ def load_or_create(path: Path) -> MutableMapping[str, Any]:
     if not path.exists():
         return {
             "version": 1,
+            "timezone": "UTC",
             "jobs": {},
             "asset_jobs": [],
             "partitions": {},
@@ -37,6 +38,7 @@ def load_or_create(path: Path) -> MutableMapping[str, Any]:
     if data is None:
         return {
             "version": 1,
+            "timezone": "UTC",
             "jobs": {},
             "asset_jobs": [],
             "partitions": {},
@@ -48,6 +50,8 @@ def load_or_create(path: Path) -> MutableMapping[str, Any]:
 
     if "version" not in data:
         data["version"] = 1
+    if "timezone" not in data:
+        data["timezone"] = "UTC"
     if "jobs" not in data:
         data["jobs"] = {}
     if "asset_jobs" not in data:
@@ -107,6 +111,7 @@ class OrchestrationIndex:
     partitions_by_model: dict[str, str]
     asset_job_models: set[str]
     group_job_by_model: dict[str, str]
+    timezone: str = "UTC"  # Global schedule execution timezone
 
 
 def index(data: Mapping[str, Any]) -> OrchestrationIndex:
@@ -151,11 +156,33 @@ def index(data: Mapping[str, Any]) -> OrchestrationIndex:
                     raise ValueError(f"Model '{name}' appears in multiple jobs: '{group_job_by_model[name]}' and '{job_name}'")
                 group_job_by_model[name] = job_name
 
+    # Parse global timezone
+    timezone = "UTC"
+    raw_timezone = data.get("timezone")
+    if raw_timezone is not None:
+        if not isinstance(raw_timezone, str) or not raw_timezone.strip():
+            raise ValueError("timezone must be a non-empty string")
+        timezone = raw_timezone.strip()
+
     return OrchestrationIndex(
         partitions_by_model=partitions_by_model,
         asset_job_models=asset_job_models,
         group_job_by_model=group_job_by_model,
+        timezone=timezone,
     )
+
+
+def set_timezone(*, data: MutableMapping[str, Any], timezone: str) -> None:
+    """Set the global schedule execution timezone.
+
+    Args:
+        data: Orchestration config dict
+        timezone: IANA timezone name (e.g. 'UTC', 'Asia/Shanghai')
+    """
+    timezone = timezone.strip()
+    if not timezone:
+        raise ValueError("timezone must be a non-empty string")
+    data["timezone"] = timezone
 
 
 def set_partition(*, data: MutableMapping[str, Any], model: str, partition: str | None) -> None:

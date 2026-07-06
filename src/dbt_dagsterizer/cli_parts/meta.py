@@ -41,6 +41,9 @@ from ..orchestration_config import (
 from ..orchestration_config import (
     set_schedule as orch_set_schedule,
 )
+from ..orchestration_config import (
+    set_timezone as orch_set_timezone,
+)
 from .common import orchestration_path, resolve_dir_arg, select_models, split_csv
 from .validation import (
     save_orchestration_with_validation,
@@ -622,5 +625,32 @@ def build_meta_group() -> click.Group:
         if errors:
             raise click.ClickException(f"Validation failed with {len(errors)} error(s)")
         click.echo("OK")
+
+    @meta.command("timezone")
+    @click.option("--dbt-project-dir", default="./dbt_project", show_default=True)
+    @click.option("--path", "path_", default="dagsterization.yml", show_default=True)
+    @click.option("--timezone", required=True, help="IANA timezone name (e.g. UTC, Asia/Shanghai)")
+    @click.option("--prepare/--no-prepare", default=True, show_default=True)
+    def meta_timezone(
+        dbt_project_dir: str,
+        path_: str,
+        timezone: str,
+        prepare: bool,
+    ) -> None:
+        """Set the global schedule execution timezone."""
+        dbt_project_path = resolve_dir_arg(dbt_project_dir)
+        if not dbt_project_path.exists():
+            raise click.ClickException(f"dbt project dir does not exist: {dbt_project_path}")
+
+        target = orchestration_path(dbt_project_dir=dbt_project_path, path_=path_)
+        data = load_orch(target)
+        orch_set_timezone(data=data, timezone=timezone)
+        save_orchestration_with_validation(
+            target=target,
+            data=data,
+            dbt_project_dir=dbt_project_path,
+            prepare=prepare,
+        )
+        click.echo(str(target))
 
     return meta

@@ -1,5 +1,7 @@
 version: 1
 
+timezone: Asia/Macau
+
 jobs:
   daily_facts_job:
     models:

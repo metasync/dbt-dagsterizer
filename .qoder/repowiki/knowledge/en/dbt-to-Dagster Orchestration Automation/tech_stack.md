@@ -1,1 +1,0 @@
-Uses `dagster-dbt` for dbt integration, `cookiecutter` for project scaffolding, and `ruamel-yaml` for robust YAML configuration handling. Targets StarRocks via `dbt-starrocks` and `pymysql`.

@@ -1,3 +1,0 @@
-- Factory functions in `jobs/`, `schedules/`, and `sensors/` submodules return lists of Dagster definitions, which are aggregated by top-level `get_*()` functions in their respective `__init__.py` files.
-- Orchestration configuration is loaded and indexed via `orchestration_config.py` helpers (`load_or_create`, `index`) before being passed to factory functions for spec resolution.
-- Dbt manifest data is accessed via shared utilities in `dbt/manifest.py` and `assets/dbt/prepare.py` to ensure consistent state across asset, sensor, and automation modules.

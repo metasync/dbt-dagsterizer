@@ -1,3 +1,0 @@
-- CLI installation: `uv tool install dbt-dagsterizer`
-- Development setup: `uv sync --dev`
-- Orchestration init: `dbt-dagsterizer meta init --parse` to generate the initial `dagsterization.yml` and dbt manifest.

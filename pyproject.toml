@@ -13,6 +13,7 @@ dependencies = [
     "dbt-starrocks>=1.9,<2",
     "pymysql>=1.1.0",
     "ruamel-yaml>=0.19.1",
+    "grpcio==1.81.1"
 ]
 
 [tool.hatch.build.targets.wheel]

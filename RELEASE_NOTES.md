@@ -7,6 +7,35 @@ These notes are intended to be a polished companion to `CHANGELOG.md`:
 - `CHANGELOG.md` remains the cumulative project history.
 - This document provides concise, version-by-version release summaries that are easy to reuse for GitHub Releases and upgrade communication.
 
+## v0.3.2
+
+Release date: 2026-07-11
+
+### Summary
+
+`v0.3.2` improves schedule-timezone ergonomics across project scaffolding and day-2 configuration, tightens validation so invalid timezone values are rejected earlier, and removes a Dagster deprecation warning from the job-selection path.
+
+### Added
+
+- Added `--schedule-timezone` to `project init` so rendered projects can set the initial schedule execution timezone in `dbt_project/dagsterization.yml`.
+- Added direct documentation and examples for `meta timezone` so users can update schedule execution timezone after project generation.
+
+### Changed
+
+- Changed the rendered project template to accept a `schedule_timezone` Cookiecutter parameter, defaulting to `UTC`.
+- Updated CLI, getting-started, and template workflow docs to explain both scaffold-time and later timezone configuration paths with concrete examples.
+
+### Fixed
+
+- Fixed relation-based asset key sanitization to flow through the shared key builder so dbt assets, jobs, and sensors keep referencing the same keys.
+- Fixed timezone validation to reject invalid IANA timezone names consistently across runtime config, `project init`, and direct Cookiecutter rendering.
+- Fixed the remaining Dagster deprecation warning by replacing `AssetSelection.keys(...)` with `AssetSelection.assets(...)`.
+
+### Upgrade Notes
+
+- No migration is required.
+- New projects still default to `UTC`; use `--schedule-timezone` during `project init` or `dbt-dagsterizer meta timezone --timezone ...` later if you want a different schedule execution timezone.
+
 ## v0.3.1
 
 Release date: 2026-06-10

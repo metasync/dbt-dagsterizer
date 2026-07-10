@@ -67,7 +67,6 @@ class LubanDagsterDbtTranslator(DagsterDbtTranslator):
         if resource_type != "model":
             return None
 
-        fqn = dbt_resource_props.get("fqn", [])
         name = dbt_resource_props.get("name")
         tags = set(dbt_resource_props.get("tags", []))
         is_daily = bool(name) and self.partitions_by_model.get(
@@ -75,13 +74,16 @@ class LubanDagsterDbtTranslator(DagsterDbtTranslator):
 
         automation_tables = self.automation_observable_tables
 
-        if "dwd" in fqn and name in automation_tables:
+        if name in automation_tables:
             return dg.AutomationCondition.eager()
 
-        if self._propagator_mode_is_eager() and "dws" in fqn and is_daily:
+        if self._propagator_mode_is_eager() and is_daily:
             return dg.AutomationCondition.eager()
 
-        if "dws" in fqn and "dim" in tags:
+        if "dim" in tags:
+            return dg.AutomationCondition.eager()
+
+        if "automation_table" in tags:
             return dg.AutomationCondition.eager()
 
         return None

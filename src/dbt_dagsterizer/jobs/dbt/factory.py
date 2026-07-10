@@ -25,7 +25,7 @@ def _build_selection(selection_spec):
 
     if selection_type == "asset_keys":
         keys = [AssetKey(path) for path in selection_spec["keys"]]
-        selection = AssetSelection.keys(*keys)
+        selection = AssetSelection.assets(*keys)
         if selection_spec.get("upstream"):
             selection = selection.upstream()
         return selection

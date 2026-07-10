@@ -35,6 +35,12 @@ dbt-dagsterizer meta init --parse
 dbt-dagsterizer meta validate --prepare
 ```
 
+Schedule timezone:
+
+- New rendered projects default `dbt_project/dagsterization.yml` to `timezone: UTC`.
+- To choose a different timezone at scaffold time, use `dbt-dagsterizer project init --schedule-timezone "Asia/Macau"`.
+- To change it later, run `dbt-dagsterizer meta timezone --dbt-project-dir ./dbt_project --timezone "Asia/Macau" --no-prepare`.
+
 To generate GitOps (kustomize-style) `configmap.yaml` / `secret.yaml` files from a mature local `.env`, run:
 
 ```bash

@@ -77,6 +77,7 @@ dbt-dagsterizer project init \
   --output-dir . \
   --project-name "Orders Analytics" \
   --namespace "metasync" \
+  --schedule-timezone "Asia/Macau" \
   --author-name "You" \
   --author-email "you@example.com"
 ```
@@ -91,10 +92,28 @@ Notes:
 - `--local-dbt-dagsterizer-path` writes a `dbt-dagsterizer @ file://...` dependency into the rendered `pyproject.toml` (mutually exclusive with `--dbt-dagsterizer-version` and `--no-pin-dbt-dagsterizer`).
 - `--no-pin-dbt-dagsterizer` leaves `dbt-dagsterizer` unpinned in the rendered `pyproject.toml` (mutually exclusive with `--dbt-dagsterizer-version`).
 - `--namespace` is optional and is used as a prefix for generated defaults (for example OTEL service naming and StarRocks DB names).
+- `--schedule-timezone` writes the initial `timezone` field into `dbt_project/dagsterization.yml`. Use an IANA timezone such as `UTC`, `Asia/Macau`, or `America/New_York`.
 - `--include-docker` is optional; when enabled, includes a local StarRocks docker-compose file and docker-related Make targets.
 - `--output-dir` controls where the project directory is created.
 - `--force` overwrites an existing output directory.
 - By default the rendered dbt project is an empty skeleton; use `--include-sample-dbt-project` to include sample models.
+
+Examples:
+
+- Keep the default schedule timezone:
+
+```bash
+dbt-dagsterizer project init --output-dir . --project-name "Orders Analytics"
+```
+
+- Start a new project with a non-UTC schedule timezone:
+
+```bash
+dbt-dagsterizer project init \
+  --output-dir . \
+  --project-name "Orders Analytics" \
+  --schedule-timezone "Asia/Macau"
+```
 
 See also: [../observability.md](../observability.md).
 
@@ -185,6 +204,37 @@ Flags:
 
 - `--offset-days`: partition offset for `daily_at` schedules (`1` = yesterday, `0` = today)
 - `--parse`: run `dbt parse` after writing
+
+### `meta timezone`
+
+Sets the global schedule execution timezone in `dagsterization.yml`.
+
+```bash
+dbt-dagsterizer meta timezone --timezone "Asia/Macau"
+```
+
+Examples:
+
+- Switch an existing project back to UTC:
+
+```bash
+dbt-dagsterizer meta timezone --timezone "UTC"
+```
+
+- Set a project to run schedules in local business time:
+
+```bash
+dbt-dagsterizer meta timezone \
+  --dbt-project-dir ./dbt_project \
+  --timezone "Asia/Macau" \
+  --no-prepare
+```
+
+Notes:
+
+- The timezone is global for schedules generated from `dagsterization.yml`.
+- Use IANA timezone names such as `UTC`, `Asia/Macau`, or `America/New_York`.
+- Invalid timezone names are rejected by the CLI before the config is written.
 
 ### `meta partition`
 

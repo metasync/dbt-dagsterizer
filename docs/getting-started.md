@@ -72,6 +72,7 @@ dbt-dagsterizer project init \
   --output-dir . \
   --project-name "Orders Analytics" \
   --namespace "metasync" \
+  --schedule-timezone "Asia/Macau" \
   --author-name "You" \
   --author-email "you@example.com"
 ```
@@ -82,6 +83,24 @@ To include sample dbt models in the rendered project:
 
 ```bash
 dbt-dagsterizer project init --output-dir . --project-name "Orders Analytics" --namespace "metasync" --include-sample-dbt-project
+```
+
+Schedule timezone tips:
+
+- New projects default to `UTC`.
+- To pick a different timezone during scaffolding, use `--schedule-timezone`, for example:
+
+```bash
+dbt-dagsterizer project init \
+  --output-dir . \
+  --project-name "Orders Analytics" \
+  --schedule-timezone "Asia/Macau"
+```
+
+- To change the timezone later in an existing project:
+
+```bash
+dbt-dagsterizer meta timezone --dbt-project-dir ./dbt_project --timezone "Asia/Macau" --no-prepare
 ```
 
 ## Quick start (Python)

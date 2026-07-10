@@ -180,6 +180,15 @@ Notes:
 - Use `offset_days: 1` for the common “process yesterday” daily pattern.
 - Use `offset_days: 0` when the schedule should target today’s partition.
 - `offset_days` is part of `dagsterization.yml`, validated by the CLI, and preserved by auto-generated schedule specs.
+- Schedule execution timezone is configured separately via the top-level `timezone` field in `dagsterization.yml`.
+
+Set or change the global schedule timezone:
+
+```bash
+dbt-dagsterizer meta timezone --dbt-project-dir ./dbt_project --timezone "Asia/Macau" --no-prepare
+```
+
+Use an IANA timezone such as `UTC`, `Asia/Macau`, or `America/New_York`.
 
 ## Partition-change sensors (late arrivals)
 

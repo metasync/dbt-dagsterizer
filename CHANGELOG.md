@@ -8,14 +8,30 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 
 ### Added
 
+### Fixed
+
+### Changed
+
+## [0.3.2] - 2026-07-11
+
+### Added
+
 - Added `--local-dbt-dagsterizer-path` to `project init` to render projects that depend on a local `dbt-dagsterizer` checkout via a `file://` dependency.
 - Added `make refresh-dagsterizer` to the rendered project template to reinstall a local `dbt-dagsterizer` dependency (`uv sync --reinstall-package dbt-dagsterizer`) and re-sync template macros.
 - Added a dedicated local development guide for iterating on `dbt-dagsterizer` with a rendered validation project.
+- Added `--schedule-timezone` to `project init` so rendered projects can set the initial schedule execution timezone in `dbt_project/dagsterization.yml`.
+- Added `meta timezone` documentation and examples covering both scaffold-time and later timezone changes.
 
 ### Fixed
 
 - Fixed observable source assets to set `group_name="source"` so source-like assets do not appear in Dagster’s `default` group.
 - Clarified in the sample template docs that `ods_test_*` models only bootstrap demo ODS tables locally and may make the Dagster lineage graph differ from a production project.
+- Fixed relation-based asset key sanitization to run through the shared key builder so dbt assets, jobs, and sensors continue to reference the same keys.
+- Fixed timezone validation to reject invalid IANA timezone names before schedule definitions are created.
+
+### Changed
+
+- Changed the rendered project template to accept a `schedule_timezone` Cookiecutter parameter, defaulting to `UTC`.
 
 ## [0.3.1] - 2026-06-10
 

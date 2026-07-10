@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import subprocess
+import sys
 from pathlib import Path
 
 from click.testing import CliRunner
@@ -14,6 +16,35 @@ def _make_local_dbt_dagsterizer_checkout(path: Path, *, project_name: str = "dbt
         encoding="utf-8",
     )
     return path
+
+
+def _run_rendered_pre_gen_hook(
+    tmp_path: Path,
+    *,
+    default_env: str = "development",
+    schedule_timezone: str = "UTC",
+) -> subprocess.CompletedProcess[str]:
+    hook_template = (
+        Path(__file__).resolve().parents[1]
+        / "src"
+        / "dbt_dagsterizer"
+        / "project_templates"
+        / "luban-dagster-dbt-starrocks-code-location-source-template"
+        / "hooks"
+        / "pre_gen_project.py"
+    )
+    rendered = (
+        hook_template.read_text(encoding="utf-8")
+        .replace("{{ cookiecutter.default_env }}", default_env)
+        .replace("{{ cookiecutter.schedule_timezone }}", schedule_timezone)
+    )
+    script_path = tmp_path / "pre_gen_project.py"
+    script_path.write_text(rendered, encoding="utf-8")
+    return subprocess.run(
+        [sys.executable, str(script_path)],
+        capture_output=True,
+        text=True,
+    )
 
 
 def test_project_init_renders_into_output_dir(tmp_path: Path):
@@ -132,6 +163,17 @@ def test_project_init_rejects_invalid_schedule_timezone(tmp_path: Path):
     )
     assert result.exit_code != 0
     assert "invalid timezone" in result.output
+
+
+def test_template_pre_gen_hook_accepts_valid_schedule_timezone(tmp_path: Path):
+    result = _run_rendered_pre_gen_hook(tmp_path, schedule_timezone="Asia/Macau")
+    assert result.returncode == 0, result.stderr
+
+
+def test_template_pre_gen_hook_rejects_invalid_schedule_timezone(tmp_path: Path):
+    result = _run_rendered_pre_gen_hook(tmp_path, schedule_timezone="Mars/Olympus_Mons")
+    assert result.returncode != 0
+    assert "Invalid cookiecutter.schedule_timezone" in result.stderr
 
 
 def test_project_init_output_name_overrides_folder_name(tmp_path: Path):

@@ -15,10 +15,10 @@ clean:
 build: clean
 	uv build
 
-publish:
+publish: build
 	@test -n "$$UV_PUBLISH_TOKEN"
 	uv publish
 
-publish-test:
+publish-test: build
 	@test -n "$$UV_PUBLISH_TOKEN"
 	uv publish --publish-url https://test.pypi.org/legacy/ --check-url https://test.pypi.org/simple/

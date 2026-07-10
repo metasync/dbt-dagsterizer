@@ -7,7 +7,11 @@ from dagster_dbt import get_asset_keys_by_output_name_for_source
 
 
 def _quoted_identifier(identifier: str) -> str:
-    return "`" + identifier.replace("`", "``") + "`"
+    if "." not in identifier:
+        return "`" + identifier.replace("`", "``") + "`"
+    else:
+        parts = str(identifier).split(".")
+        return ".".join("`" + part.replace("`", "``") + "`" for part in parts)
 
 
 def build_observable_source_assets(

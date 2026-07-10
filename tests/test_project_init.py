@@ -61,6 +61,9 @@ def test_project_init_renders_into_output_dir(tmp_path: Path):
     assert 'os.environ.setdefault("DBT_PROFILES_DIR", str(DBT_PROJECT_DIR))' in content
     assert "dbt_project_dir=DBT_PROJECT_DIR" in content
 
+    dagsterization = (project_root / "dbt_project" / "dagsterization.yml").read_text(encoding="utf-8")
+    assert "timezone: UTC" in dagsterization
+
 
 def test_project_init_namespace_affects_env_defaults(tmp_path: Path):
     runner = CliRunner()
@@ -86,6 +89,49 @@ def test_project_init_namespace_affects_env_defaults(tmp_path: Path):
     assert "OTEL_SERVICE_NAME=demo_project/demo_app" in env_example
     assert "service.namespace=demo_project" in env_example
     assert "STARROCKS_DWS_DB=demo_project_demo_app_dws_" in env_example
+
+
+def test_project_init_renders_requested_schedule_timezone(tmp_path: Path):
+    runner = CliRunner()
+    out_dir = tmp_path / "out"
+
+    result = runner.invoke(
+        cli,
+        [
+            "project",
+            "init",
+            "--output-dir",
+            str(out_dir),
+            "--project-name",
+            "Demo App",
+            "--schedule-timezone",
+            "Asia/Macau",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+
+    dagsterization = (out_dir / "demo-app" / "dbt_project" / "dagsterization.yml").read_text(encoding="utf-8")
+    assert "timezone: Asia/Macau" in dagsterization
+
+
+def test_project_init_rejects_invalid_schedule_timezone(tmp_path: Path):
+    runner = CliRunner()
+
+    result = runner.invoke(
+        cli,
+        [
+            "project",
+            "init",
+            "--output-dir",
+            str(tmp_path / "out"),
+            "--project-name",
+            "Demo App",
+            "--schedule-timezone",
+            "Mars/Olympus_Mons",
+        ],
+    )
+    assert result.exit_code != 0
+    assert "invalid timezone" in result.output
 
 
 def test_project_init_output_name_overrides_folder_name(tmp_path: Path):

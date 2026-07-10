@@ -1,6 +1,6 @@
 version: 1
 
-timezone: UTC
+timezone: {{ cookiecutter.schedule_timezone }}
 
 jobs:
   daily_facts_job:

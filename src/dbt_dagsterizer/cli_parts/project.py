@@ -10,6 +10,7 @@ from pathlib import Path
 import click
 
 from ..gitops_env import generate_gitops_env
+from ..orchestration_config import normalize_timezone
 
 
 def _default_dagster_version() -> str:
@@ -191,6 +192,12 @@ def build_project_group() -> click.Group:
         help="Do not pin dbt-dagsterizer in the rendered project's dependencies (mutually exclusive with --dbt-dagsterizer-version).",
     )
     @click.option("--default-env", default="development", show_default=True)
+    @click.option(
+        "--schedule-timezone",
+        default="UTC",
+        show_default=True,
+        help="IANA timezone written into dagsterization.yml for schedule execution.",
+    )
     @click.option("--code-location-port", default="3000", show_default=True)
     @click.option("--include-sample-dbt-project", is_flag=True, default=False, show_default=True)
     @click.option("--include-docker", is_flag=True, default=False, show_default=True)
@@ -210,6 +217,7 @@ def build_project_group() -> click.Group:
         local_dbt_dagsterizer_path: Path | None,
         no_pin_dbt_dagsterizer: bool,
         default_env: str,
+        schedule_timezone: str,
         code_location_port: str,
         include_sample_dbt_project: bool,
         include_docker: bool,
@@ -239,6 +247,10 @@ def build_project_group() -> click.Group:
         dagster_version_value = dagster_version.strip()
         if not dagster_version_value:
             raise click.ClickException("--dagster-version must be non-empty")
+        try:
+            schedule_timezone_value = normalize_timezone(schedule_timezone, default="UTC")
+        except ValueError as e:
+            raise click.ClickException(f"--schedule-timezone {e}") from e
 
         if local_dbt_dagsterizer_path is not None:
             if no_pin_dbt_dagsterizer or dbt_dagsterizer_version is not None:
@@ -298,6 +310,7 @@ def build_project_group() -> click.Group:
             "dbt_dagsterizer_version": dbt_dagsterizer_version_value,
             "dbt_dagsterizer_file_url": dbt_dagsterizer_file_url_value,
             "default_env": default_env,
+            "schedule_timezone": schedule_timezone_value,
             "code_location_port": str(code_location_port),
             "include_sample_dbt_project": bool(include_sample_dbt_project),
             "include_docker": bool(include_docker),

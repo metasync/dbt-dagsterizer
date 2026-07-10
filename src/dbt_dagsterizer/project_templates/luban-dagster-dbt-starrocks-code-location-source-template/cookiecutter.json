@@ -8,6 +8,7 @@
   "dbt_dagsterizer_version": "",
   "dbt_dagsterizer_file_url": "",
   "default_env": "development",
+  "schedule_timezone": "UTC",
   "code_location_port": "3000",
   "include_sample_dbt_project": false,
   "include_docker": false,

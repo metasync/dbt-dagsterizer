@@ -5,6 +5,7 @@ from dagster import DefaultScheduleStatus, ScheduleDefinition
 
 from ...orchestration_config import (
     default_orchestration_path,
+    normalize_timezone,
     resolve_orchestration_path,
 )
 from ...orchestration_config import (
@@ -22,7 +23,7 @@ def _get_global_timezone() -> str:
             path_=Path(default_orchestration_path(dbt_project_dir=dbt_project_dir).name),
         )
         cfg = load_orch(cfg_path)
-        return str(cfg.get("timezone", "UTC") or "UTC").strip() or "UTC"
+        return normalize_timezone(cfg.get("timezone"), default="UTC")
     except Exception:
         return "UTC"
 

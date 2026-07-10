@@ -2,6 +2,8 @@ from datetime import datetime, timedelta, timezone
 
 import dagster as dg
 
+from ...orchestration_config import normalize_timezone
+
 
 def _with_optional_tick_suffix(*, run_key: str, scheduled_time, dedupe_across_ticks: bool) -> str:
     if dedupe_across_ticks:
@@ -83,7 +85,7 @@ def build_dbt_schedules(schedule_specs, jobs_by_name):
 
             partition_offset_days = int(spec.get("partition_offset_days", 0))
             partition_lookback_days = int(spec.get("partition_lookback_days", 0))
-            execution_timezone = str(spec.get("timezone", "UTC") or "UTC").strip() or "UTC"
+            execution_timezone = normalize_timezone(spec.get("timezone"), default="UTC")
             schedules_by_name[spec["name"]] = _build_daily_partitioned_schedule(
                 name=spec["name"],
                 cron_schedule=spec["cron_schedule"],
@@ -99,4 +101,3 @@ def build_dbt_schedules(schedule_specs, jobs_by_name):
         raise ValueError(f"Unsupported partition_type: {partition_type}")
 
     return list(schedules_by_name.values())
-

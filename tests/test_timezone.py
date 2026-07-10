@@ -84,6 +84,15 @@ def test_index_raises_on_empty_timezone():
         index(data)
 
 
+def test_index_raises_on_unknown_timezone():
+    """Unknown IANA timezone raises ValueError."""
+    from dbt_dagsterizer.orchestration_config import index
+
+    data = {"timezone": "Mars/Olympus_Mons", "partitions": {}}
+    with pytest.raises(ValueError, match="invalid timezone"):
+        index(data)
+
+
 def test_set_timezone():
     """set_timezone writes the timezone to the config dict."""
     from dbt_dagsterizer.orchestration_config import set_timezone
@@ -109,6 +118,15 @@ def test_set_timezone_rejects_empty():
     data = {"version": 1}
     with pytest.raises(ValueError, match="non-empty"):
         set_timezone(data=data, timezone="")
+
+
+def test_set_timezone_rejects_unknown_timezone():
+    """set_timezone raises ValueError for an unknown timezone."""
+    from dbt_dagsterizer.orchestration_config import set_timezone
+
+    data = {"version": 1}
+    with pytest.raises(ValueError, match="invalid timezone"):
+        set_timezone(data=data, timezone="Mars/Olympus_Mons")
 
 
 # --- preset tests ---
@@ -231,3 +249,21 @@ def test_validate_structure_rejects_non_string_timezone():
     issues = validate_orchestration_structure(orchestration=orch)
     errors = [i for i in issues if i.level == "error"]
     assert any("timezone" in i.message for i in errors)
+
+
+def test_validate_structure_rejects_unknown_timezone():
+    """validate_orchestration_structure rejects unknown timezone names."""
+    from dbt_dagsterizer.cli_parts.validation import validate_orchestration_structure
+
+    orch = {
+        "version": 1,
+        "timezone": "Mars/Olympus_Mons",
+        "partitions": {},
+        "jobs": {},
+        "asset_jobs": [],
+        "schedules": {},
+        "partition_change": {"detectors": [], "propagators": []},
+    }
+    issues = validate_orchestration_structure(orchestration=orch)
+    errors = [i for i in issues if i.level == "error"]
+    assert any("invalid timezone" in i.message for i in errors)

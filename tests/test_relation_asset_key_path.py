@@ -17,3 +17,13 @@ def test_relation_asset_key_path_keeps_database_and_schema_when_present():
         "customers",
     ]
 
+
+def test_relation_asset_key_path_sanitizes_unsupported_characters():
+    from dbt_dagsterizer.assets.dbt.translator import relation_asset_key_path
+
+    assert relation_asset_key_path(database="my-db", schema="raw.data", identifier="orders-daily") == [
+        "dbt",
+        "my_db",
+        "raw_data",
+        "orders_daily",
+    ]

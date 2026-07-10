@@ -9,6 +9,7 @@ import click
 
 from ..dbt.manifest_prepare import load_manifest, manifest_path
 from ..orchestration_config import index as index_orch
+from ..orchestration_config import normalize_timezone
 from ..orchestration_config import save as save_orch
 from .common import existing_model_names
 
@@ -205,8 +206,10 @@ def validate_orchestration_structure(*, orchestration: dict[str, Any]) -> list[V
     # Validate timezone
     raw_tz = orchestration.get("timezone")
     if raw_tz is not None:
-        if not isinstance(raw_tz, str) or not raw_tz.strip():
-            issues.append(ValidationIssue("error", "timezone must be a non-empty string"))
+        try:
+            normalize_timezone(raw_tz, default="UTC")
+        except ValueError as exc:
+            issues.append(ValidationIssue("error", str(exc)))
 
     try:
         idx = index_orch(orchestration)

@@ -4,6 +4,7 @@ from collections.abc import Mapping, MutableMapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from ruamel.yaml import YAML
 
@@ -18,6 +19,24 @@ def _yaml() -> YAML:
 
 def default_orchestration_path(*, dbt_project_dir: Path) -> Path:
     return dbt_project_dir / "dagsterization.yml"
+
+
+def normalize_timezone(timezone: object, *, default: str = "UTC") -> str:
+    if timezone is None:
+        return default
+    if not isinstance(timezone, str):
+        raise ValueError("timezone must be a non-empty IANA timezone string")
+
+    normalized = timezone.strip()
+    if not normalized:
+        raise ValueError("timezone must be a non-empty IANA timezone string")
+
+    try:
+        ZoneInfo(normalized)
+    except ZoneInfoNotFoundError as exc:
+        raise ValueError(f"invalid timezone '{normalized}'") from exc
+
+    return normalized
 
 
 def load_or_create(path: Path) -> MutableMapping[str, Any]:
@@ -157,12 +176,7 @@ def index(data: Mapping[str, Any]) -> OrchestrationIndex:
                 group_job_by_model[name] = job_name
 
     # Parse global timezone
-    timezone = "UTC"
-    raw_timezone = data.get("timezone")
-    if raw_timezone is not None:
-        if not isinstance(raw_timezone, str) or not raw_timezone.strip():
-            raise ValueError("timezone must be a non-empty string")
-        timezone = raw_timezone.strip()
+    timezone = normalize_timezone(data.get("timezone"), default="UTC")
 
     return OrchestrationIndex(
         partitions_by_model=partitions_by_model,
@@ -179,10 +193,7 @@ def set_timezone(*, data: MutableMapping[str, Any], timezone: str) -> None:
         data: Orchestration config dict
         timezone: IANA timezone name (e.g. 'UTC', 'Asia/Shanghai')
     """
-    timezone = timezone.strip()
-    if not timezone:
-        raise ValueError("timezone must be a non-empty string")
-    data["timezone"] = timezone
+    data["timezone"] = normalize_timezone(timezone, default="UTC")
 
 
 def set_partition(*, data: MutableMapping[str, Any], model: str, partition: str | None) -> None:

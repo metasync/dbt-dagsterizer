@@ -1,6 +1,6 @@
 version: 1
 
-timezone: Asia/Macau
+timezone: UTC
 
 jobs:
   daily_facts_job:

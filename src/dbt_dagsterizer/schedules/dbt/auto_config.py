@@ -5,6 +5,7 @@ from pathlib import Path
 from ...dbt.manifest import iter_models, load_manifest
 from ...orchestration_config import (
     default_orchestration_path,
+    normalize_timezone,
     resolve_orchestration_path,
 )
 from ...orchestration_config import (
@@ -28,7 +29,7 @@ def build_auto_dbt_schedule_specs() -> list[dict]:
     cfg = load_orch(cfg_path)
     idx = index_orch(cfg)
 
-    global_timezone = str(cfg.get("timezone", "UTC") or "UTC").strip() or "UTC"
+    global_timezone = normalize_timezone(cfg.get("timezone"), default="UTC")
 
     specs: list[dict] = []
     schedules = cfg.get("schedules")

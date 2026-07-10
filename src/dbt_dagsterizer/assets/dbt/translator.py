@@ -8,6 +8,8 @@ from dagster_dbt import DagsterDbtTranslator
 
 from ...partitions import get_daily_partitions_def
 
+import re
+
 
 def _relation_asset_key(dbt_resource_props: Mapping[str, Any]) -> dg.AssetKey:
     """Build a relation-based AssetKey from dbt resource properties.
@@ -21,6 +23,11 @@ def _relation_asset_key(dbt_resource_props: Mapping[str, Any]) -> dg.AssetKey:
     database = dbt_resource_props.get("database") or ""
     schema = dbt_resource_props.get("schema") or ""
     identifier = dbt_resource_props.get("identifier") or dbt_resource_props.get("name") or ""
+
+    database = re.sub(r'[^A-Za-z0-9_]', '_', database)
+    schema = re.sub(r'[^A-Za-z0-9_]', '_', schema)
+    identifier = re.sub(r'[^A-Za-z0-9_]', '_', identifier)
+    
     return dg.AssetKey(relation_asset_key_path(database=str(database), schema=str(schema), identifier=str(identifier)))
 
 

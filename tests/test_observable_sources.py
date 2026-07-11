@@ -147,3 +147,44 @@ def test_build_observable_source_assets_uses_watermark_sql_when_provided(monkeyp
 
     assert isinstance(result, dg.DataVersion)
     assert queries == ["select max(updated_at) from custom.orders_view"]
+
+
+def test_build_observable_source_assets_quotes_each_part_of_dotted_identifiers(monkeypatch):
+    from dbt_dagsterizer.assets.sources import factory
+
+    queries: list[str] = []
+
+    class FakeStarRocks:
+        def query_scalar(self, sql: str) -> str:
+            queries.append(sql)
+            return "2026-06-10T00:00:00"
+
+    def fake_observable_source_asset(**_kwargs):
+        def decorator(fn):
+            return fn
+
+        return decorator
+
+    monkeypatch.setattr(
+        factory,
+        "get_asset_keys_by_output_name_for_source",
+        lambda _dbt_assets_seq, _source: {"external.orders": dg.AssetKey(["demo", "orders"])},
+    )
+    monkeypatch.setattr(factory.dg, "observable_source_asset", fake_observable_source_asset)
+
+    assets = factory.build_observable_source_assets(
+        dbt_assets=None,
+        source_specs=[
+            {
+                "source": "ods",
+                "table": "external.orders",
+                "watermark_column": "updated.at",
+            }
+        ],
+        source_db_default_map={"ods": "catalog.db"},
+    )
+
+    result = assets[0](SimpleNamespace(resources=SimpleNamespace(starrocks=FakeStarRocks())))
+
+    assert isinstance(result, dg.DataVersion)
+    assert queries == ["select max(`updated`.`at`) from `catalog`.`db`.`external`.`orders`"]

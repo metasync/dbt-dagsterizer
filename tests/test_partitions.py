@@ -52,3 +52,62 @@ def test_translator_can_lazy_load_daily_partitions_def(monkeypatch):
     partitions_def = t.get_partitions_def({"name": "orders"})
     assert isinstance(partitions_def, DailyPartitionsDefinition)
     assert t.daily_partitions_def is partitions_def
+
+
+@pytest.mark.parametrize(
+    ("props", "partitions_by_model", "propagator_mode", "should_enable"),
+    [
+        (
+            {"resource_type": "model", "name": "orders", "fqn": ["pkg", "staging", "orders"]},
+            {},
+            "sensor",
+            True,
+        ),
+        (
+            {"resource_type": "model", "name": "fact_orders", "tags": [], "fqn": ["pkg", "mart", "fact_orders"]},
+            {"fact_orders": "daily"},
+            "eager",
+            True,
+        ),
+        (
+            {"resource_type": "model", "name": "dim_customer", "tags": ["dim"], "fqn": ["pkg", "shared", "dim_customer"]},
+            {},
+            "sensor",
+            True,
+        ),
+        (
+            {
+                "resource_type": "model",
+                "name": "custom_model",
+                "tags": ["automation_table"],
+                "fqn": ["pkg", "custom", "custom_model"],
+            },
+            {},
+            "sensor",
+            True,
+        ),
+        (
+            {"resource_type": "model", "name": "plain_model", "tags": [], "fqn": ["pkg", "custom", "plain_model"]},
+            {},
+            "sensor",
+            False,
+        ),
+    ],
+)
+def test_translator_automation_rules(monkeypatch, props, partitions_by_model, propagator_mode, should_enable):
+    from dbt_dagsterizer.assets.dbt.translator import LubanDagsterDbtTranslator
+
+    monkeypatch.setenv("LUBAN_PARTITION_CHANGE_PROPAGATOR_MODE", propagator_mode)
+
+    translator = LubanDagsterDbtTranslator(
+        daily_partitions_def=None,
+        automation_observable_tables={"orders"},
+        partitions_by_model=partitions_by_model,
+    )
+
+    condition = translator.get_automation_condition(props)
+
+    if should_enable:
+        assert condition is not None
+    else:
+        assert condition is None

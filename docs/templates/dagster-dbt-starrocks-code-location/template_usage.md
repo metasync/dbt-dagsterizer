@@ -54,19 +54,28 @@ Notes:
 
 When that value changes, Dagster records a new observation event for the source asset.
 
-### 2) Trigger DWD dbt models
+### 2) Trigger downstream dbt models
 
 Key pieces:
 
 - dbt asset loading: provided by `dbt_dagsterizer.assets.dbt`
 
-The dbt translator assigns `AutomationCondition.eager()` to selected dbt models under the `dwd/` folder.
-When Dagster detects the upstream ODS source asset has a newer data version, the automation sensor can request a run to materialize the affected downstream assets.
+The dbt translator assigns `AutomationCondition.eager()` to models that match one of these rules:
 
-The template also assigns `AutomationCondition.eager()` to DWS dimension models (models under `dws/` tagged `dim`).
-This enables dimension refresh (for example `dws.dim_customer`) when upstream inputs (for example `dwd.customers`) change.
+- the model name matches a table listed in observable source metadata
+- the model is daily-partitioned and `LUBAN_PARTITION_CHANGE_PROPAGATOR_MODE=eager`
+- the model carries the `dim` tag
+- the model carries the `automation_table` tag
 
-For daily fact models under `dws/` (configured as daily-partitioned in `dagsterization.yml`), this template can use partition-change propagation to trigger downstream fact partitions after upstream partitions materialize.
+When Dagster detects an upstream change, the automation sensor can request a run to materialize the affected downstream assets.
+
+In the default template layout, this commonly means:
+
+- source-driven refresh for models fed by observed ODS tables
+- eager refresh for dimension models tagged `dim`
+- eager refresh for daily-partitioned models when the propagator runs in `eager` mode
+
+These rules are driven by model metadata and partition config rather than by whether a model lives under `dwd/` or `dws/`.
 
 ### 3) Partition-change (late arrivals)
 

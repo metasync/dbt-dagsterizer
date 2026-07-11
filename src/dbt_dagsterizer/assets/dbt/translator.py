@@ -1,14 +1,13 @@
 from __future__ import annotations
 
 import os
+import re
 from typing import Any, Mapping, Optional
 
 import dagster as dg
 from dagster_dbt import DagsterDbtTranslator
 
 from ...partitions import get_daily_partitions_def
-
-import re
 
 
 def _relation_asset_key(dbt_resource_props: Mapping[str, Any]) -> dg.AssetKey:

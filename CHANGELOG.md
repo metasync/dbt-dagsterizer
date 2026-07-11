@@ -12,6 +12,21 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 
 ### Changed
 
+## [0.3.3] - 2026-07-11
+
+### Added
+
+- Added regression coverage for metadata-driven automation selection and dotted observable-source identifiers.
+
+### Fixed
+
+- Fixed observable source SQL generation to quote each part of dotted database, table, and watermark-column identifiers separately so external catalog references resolve correctly.
+- Clarified template docs and sample environment comments so the documented automation behavior matches the current metadata-driven translator rules.
+
+### Changed
+
+- Changed dbt automation selection to use observable-source metadata, daily partition configuration, and model tags instead of relying on `dwd`/`dws` FQN path segments.
+
 ## [0.3.2] - 2026-07-11
 
 ### Added

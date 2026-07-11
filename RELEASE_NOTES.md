@@ -7,6 +7,34 @@ These notes are intended to be a polished companion to `CHANGELOG.md`:
 - `CHANGELOG.md` remains the cumulative project history.
 - This document provides concise, version-by-version release summaries that are easy to reuse for GitHub Releases and upgrade communication.
 
+## v0.3.3
+
+Release date: 2026-07-11
+
+### Summary
+
+`v0.3.3` makes the new PR 6 automation behavior easier to trust in production by documenting the broader metadata-driven rules, fixing observable-source SQL generation for external catalogs, and adding focused regression coverage around both paths.
+
+### Added
+
+- Added regression tests for translator automation selection across observable-source matches, daily eager mode, `dim` tags, and `automation_table` tags.
+- Added regression coverage for observable source SQL generation when database, table, or watermark-column identifiers contain dotted catalog-style names.
+
+### Changed
+
+- Changed dbt automation selection so it no longer depends on `dwd`/`dws` FQN path segments and instead uses observable-source metadata, daily partition configuration, and model tags.
+- Updated the template usage guide to explain the current automation rules in terms of model metadata and partition config rather than template folder layout.
+
+### Fixed
+
+- Fixed observable source SQL generation to quote each part of dotted identifiers separately, which restores correct query construction for external catalog references.
+- Fixed the sample `.env.example` comment so `LUBAN_PARTITION_CHANGE_PROPAGATOR_MODE=eager` is described in terms of the models that actually opt into eager automation.
+
+### Upgrade Notes
+
+- No migration is required.
+- If you previously assumed eager automation only applied to `dwd`/`dws` folder placement, review your model tags and daily partition config instead; those are now the relevant control points.
+
 ## v0.3.2
 
 Release date: 2026-07-11

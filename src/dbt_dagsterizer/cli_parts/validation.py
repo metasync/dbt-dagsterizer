@@ -38,8 +38,21 @@ def validate_orchestration(
     for model, p_type in sorted(idx.partitions_by_model.items()):
         if model not in existing_models:
             issues.append(ValidationIssue("error", f"partitions references missing model '{model}'"))
+        # Allow daily or unpartitioned
         if p_type not in {"daily", "unpartitioned"}:
             issues.append(ValidationIssue("error", f"partitions for model '{model}' must be daily|unpartitioned"))
+
+    # Validate daily_config.include_current_day_partition
+    partitions_data = orchestration.get("partitions")
+    if isinstance(partitions_data, dict):
+        daily_config = partitions_data.get("daily_config")
+        if daily_config is not None:
+            if not isinstance(daily_config, dict):
+                issues.append(ValidationIssue("error", "partitions.daily_config must be a mapping"))
+            else:
+                include_current_day_partition = daily_config.get("include_current_day_partition")
+                if include_current_day_partition is not None and not isinstance(include_current_day_partition, bool):
+                    issues.append(ValidationIssue("error", "partitions.daily_config.include_current_day_partition must be a boolean"))
 
     jobs = orchestration.get("jobs")
     if jobs is not None and not isinstance(jobs, dict):
@@ -195,6 +208,49 @@ def validate_orchestration(
                         )
                     )
 
+    repl = orchestration.get("replication")
+    if repl is not None and not isinstance(repl, dict):
+        issues.append(ValidationIssue("error", "replication must be a mapping"))
+        return issues
+    entries = repl.get("entries") if isinstance(repl, dict) else None
+    if entries is not None and not isinstance(entries, list):
+        issues.append(ValidationIssue("error", "replication.entries must be a list"))
+    if isinstance(entries, list):
+        for i, e in enumerate(entries):
+            if not isinstance(e, dict):
+                issues.append(ValidationIssue("error", f"replication.entries[{i}] must be a mapping"))
+                continue
+            model = e.get("model")
+            if not isinstance(model, str) or not model.strip():
+                issues.append(ValidationIssue("error", f"replication.entries[{i}].model must be non-empty"))
+                continue
+            if model.strip() not in existing_models:
+                issues.append(
+                    ValidationIssue("error", f"replication.entries[{i}] references missing model '{model.strip()}'")
+                )
+            write_disposition = e.get("write_disposition")
+            if write_disposition is not None and write_disposition not in {"append", "replace", "merge"}:
+                issues.append(
+                    ValidationIssue(
+                        "error",
+                        f"replication.entries[{i}].write_disposition must be 'append', 'replace', or 'merge'",
+                    )
+                )
+            partition_column = e.get("partition_column")
+            if partition_column is not None:
+                if not isinstance(partition_column, str) or not partition_column.strip():
+                    issues.append(
+                        ValidationIssue("error", f"replication.entries[{i}].partition_column must be non-empty when set")
+                    )
+            p_type = idx.partitions_by_model.get(model.strip())
+            if p_type and p_type != "unpartitioned" and not partition_column:
+                issues.append(
+                    ValidationIssue(
+                        "warn",
+                        f"replication.entries[{i}] on partitioned model '{model.strip()}' has no partition_column; full table copy will be used",
+                    )
+                )
+
     if require_file_exists and not orchestration_path.exists():
         issues.append(ValidationIssue("error", f"orchestration file not found: {orchestration_path}"))
     return issues
@@ -202,7 +258,7 @@ def validate_orchestration(
 
 def validate_orchestration_structure(*, orchestration: dict[str, Any]) -> list[ValidationIssue]:
     issues: list[ValidationIssue] = []
-    
+
     # Validate timezone
     raw_tz = orchestration.get("timezone")
     if raw_tz is not None:
@@ -221,16 +277,23 @@ def validate_orchestration_structure(*, orchestration: dict[str, Any]) -> list[V
     if partitions is not None and not isinstance(partitions, dict):
         issues.append(ValidationIssue("error", "partitions must be a mapping"))
     if isinstance(partitions, dict):
-        for p_type, models in partitions.items():
-            if p_type not in {"daily", "unpartitioned"}:
-                issues.append(ValidationIssue("error", f"Unsupported partition type '{p_type}'"))
-                continue
-            if not isinstance(models, list):
-                issues.append(ValidationIssue("error", f"partitions.{p_type} must be a list"))
-                continue
-            for m in models:
-                if not isinstance(m, str) or not m.strip():
-                    issues.append(ValidationIssue("error", f"partitions.{p_type} contains empty model"))
+        # Validate daily/unpartitioned partitions
+        for p_type in {"daily", "unpartitioned"}:
+            models = partitions.get(p_type)
+            if isinstance(models, list):
+                for m in models:
+                    if not isinstance(m, str) or not m.strip():
+                        issues.append(ValidationIssue("error", f"partitions.{p_type} contains empty model"))
+
+        # Validate daily_config
+        daily_config = partitions.get("daily_config")
+        if daily_config is not None:
+            if not isinstance(daily_config, dict):
+                issues.append(ValidationIssue("error", "partitions.daily_config must be a mapping"))
+            else:
+                include_current_day_partition = daily_config.get("include_current_day_partition")
+                if include_current_day_partition is not None and not isinstance(include_current_day_partition, bool):
+                    issues.append(ValidationIssue("error", "partitions.daily_config.include_current_day_partition must be a boolean"))
 
     jobs = orchestration.get("jobs")
     if jobs is not None and not isinstance(jobs, dict):
@@ -277,6 +340,34 @@ def validate_orchestration_structure(*, orchestration: dict[str, Any]) -> list[V
     propagators = pc.get("propagators") if isinstance(pc, dict) else None
     if propagators is not None and not isinstance(propagators, list):
         issues.append(ValidationIssue("error", "partition_change.propagators must be a list"))
+
+    repl = orchestration.get("replication")
+    if repl is not None and not isinstance(repl, dict):
+        issues.append(ValidationIssue("error", "replication must be a mapping"))
+    else:
+        if isinstance(repl, dict):
+            enabled = repl.get("enabled")
+            if enabled is not None and not isinstance(enabled, bool):
+                issues.append(ValidationIssue("error", "replication.enabled must be a boolean"))
+            entries = repl.get("entries")
+            if entries is not None and not isinstance(entries, list):
+                issues.append(ValidationIssue("error", "replication.entries must be a list"))
+            if isinstance(entries, list):
+                for i, e in enumerate(entries):
+                    if not isinstance(e, dict):
+                        issues.append(ValidationIssue("error", f"replication.entries[{i}] must be a mapping"))
+                        continue
+                    model = e.get("model")
+                    if not isinstance(model, str) or not model.strip():
+                        issues.append(ValidationIssue("error", f"replication.entries[{i}].model must be non-empty"))
+                    write_disposition = e.get("write_disposition")
+                    if write_disposition is not None and write_disposition not in {"append", "replace", "merge"}:
+                        issues.append(
+                            ValidationIssue(
+                                "error",
+                                f"replication.entries[{i}].write_disposition must be 'append', 'replace', or 'merge'",
+                            )
+                        )
 
     _ = idx
     return issues

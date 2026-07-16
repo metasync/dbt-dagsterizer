@@ -80,8 +80,11 @@ def execute_replication(
     log.info("Destination credentials: %s", mssql_credentials.replace(mssql_client.password, "***"))
 
     # Create dlt pipeline targeting SQL Server
+    # Include partition key in pipeline_name to isolate dlt state per partition,
+    # preventing race conditions when multiple partitions run concurrently.
+    pipeline_suffix = f"_{partition_key}" if partition_key else ""
     pipeline = dlt.pipeline(
-        pipeline_name=f"replicate_{spec['model']}",
+        pipeline_name=f"replicate_{spec['model']}{pipeline_suffix}",
         destination=dlt.destinations.mssql(mssql_credentials),
         dataset_name=destination_schema,
     )

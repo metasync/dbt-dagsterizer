@@ -3,6 +3,11 @@
 Each replication asset depends on the corresponding dbt model asset (via
 ``deps=[AssetKey(...)]``) and uses the same partition definition as the dbt
 model so that partition-aware replication works correctly.
+
+Per-partition triggering is handled by a dedicated replication sensor (see
+``sensors/replication/``) rather than ``AutomationCondition.eager()`` with
+``ins``, because ``@dbt_assets`` produce materialization events (not file
+outputs) which are incompatible with ``AssetIn``-based data dependencies.
 """
 from __future__ import annotations
 
@@ -63,14 +68,17 @@ def build_replication_assets(specs: list[dict]) -> list[dg.AssetsDefinition]:
         source_relation = spec["source_relation"]
         dep_key = dg.AssetKey(source_relation)
 
-        def _make_asset(_spec: dict, _partitions_def: dg.PartitionsDefinition | None, _dep_key: dg.AssetKey):
+        def _make_asset(
+            _spec: dict,
+            _partitions_def: dg.PartitionsDefinition | None,
+            _dep_key: dg.AssetKey,
+        ):
             @dg.asset(
                 name=_spec["name"],
                 key_prefix="replication",
                 deps=[_dep_key],
                 partitions_def=_partitions_def,
                 group_name="replication",
-                automation_condition=dg.AutomationCondition.eager(),
             )
             def _replication_asset(context):
                 execute_replication(

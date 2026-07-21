@@ -23,15 +23,12 @@ def _default_daily_window_vars() -> dict[str, str]:
 
 
 def _get_dbt_vars_for_context(context) -> dict[str, str] | None:
-    """Get dbt vars based on partition type.
+    """Get dbt vars for time-window partitions.
     
-    For time-window partitions (daily, hourly, etc.):
-        Returns {min_date, max_date, min_datetime, max_datetime}
-    
-    For dynamic partitions:
-        Returns {partition_key: <key>}
+    Returns {min_date, max_date, min_datetime, max_datetime} for time-based partitions.
+    Falls back to default daily window for non-partitioned runs.
     """
-    # Try to get time window FIRST for time-based partitions (daily, hourly, monthly)
+    # Try to get time window for time-based partitions (daily, hourly, monthly)
     # IMPORTANT: Must catch exception because Dagster raises DagsterInvariantViolationError
     # when partitions_def is not defined
     try:
@@ -42,20 +39,6 @@ def _get_dbt_vars_for_context(context) -> dict[str, str] | None:
     if time_window is not None:
         # Time-based partition (daily, hourly, etc.) - return date/datetime window
         return _dbt_partition_vars_from_time_window(time_window.start, time_window.end)
-    
-    # Check if this is a dynamic partition by trying to get partition_key
-    # IMPORTANT: Must catch the exception, not use getattr(), because Dagster
-    # raises DagsterInvariantViolationError for non-partitioned runs
-    partition_key = None
-    try:
-        partition_key = context.partition_key
-    except Exception:
-        # Not a partitionized run, or partition_key not available
-        pass
-    
-    if partition_key is not None:
-        # Dynamic partition - return the partition key
-        return {"partition_key": partition_key}
     
     # Fallback for non-partitioned runs
     return _default_daily_window_vars()

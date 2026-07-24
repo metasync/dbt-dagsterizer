@@ -92,6 +92,17 @@ def test_translator_can_lazy_load_daily_partitions_def(monkeypatch):
             "sensor",
             False,
         ),
+        (
+            {
+                "resource_type": "model",
+                "name": "view_model",
+                "tags": ["materialize_at_startup"],
+                "fqn": ["pkg", "custom", "view_model"],
+            },
+            {},
+            "sensor",
+            True,
+        ),
     ],
 )
 def test_translator_automation_rules(monkeypatch, props, partitions_by_model, propagator_mode, should_enable):
@@ -254,3 +265,26 @@ def test_validation_daily_config_not_a_mapping():
     issues = validate_orchestration_structure(orchestration=data)
     errors = [i for i in issues if i.level == "error"]
     assert any("daily_config must be a mapping" in i.message for i in errors)
+
+def test_translator_view_materialization_is_fire_once():
+    from dbt_dagsterizer.assets.dbt.translator import LubanDagsterDbtTranslator
+
+    translator = LubanDagsterDbtTranslator(
+        daily_partitions_def=None,
+        automation_observable_tables=set(),
+        partitions_by_model={},
+    )
+
+    props = {
+        "resource_type": "model",
+        "name": "view_model",
+        "tags": ["materialize_at_startup"],
+        "fqn": ["pkg", "custom", "view_model"],
+    }
+
+    condition = translator.get_automation_condition(props)
+
+    import dagster as dg
+
+    assert condition is not None
+    assert condition == dg.AutomationCondition.missing()

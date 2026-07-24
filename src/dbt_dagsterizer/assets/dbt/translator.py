@@ -82,6 +82,9 @@ class LubanDagsterDbtTranslator(DagsterDbtTranslator):
         if "automation_table" in tags:
             return dg.AutomationCondition.eager()
 
+        if "materialize_at_startup" in tags:
+            return dg.AutomationCondition.missing()
+
         return None
 
     def _propagator_mode_is_eager(self) -> bool:

@@ -30,7 +30,7 @@ def load_automation_observable_sources() -> list[dict[str, str | None]]:
         if not watermark_column and not watermark_sql:
             continue
         source_name = props.get("source_name")
-        table_name = props.get("name")
+        table_name = props.get("identifier") or props.get("name")
         if not source_name or not table_name:
             continue
 

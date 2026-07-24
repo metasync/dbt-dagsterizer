@@ -8,6 +8,17 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 
 ### Added
 
+- Added package version display to dbt asset descriptions in Dagster UI, showing `dbt_dagsterizer`, `dagster`, and `dagster_dbt` versions for each code location.
+- Added optional `include_current_day_partition` setting under `partitions.daily_config` in `dagsterization.yml` to include today's partition in the `DailyPartitionsDefinition` (useful for same-day materialization).
+- Added optional StarRocks-to-MSSQL data replication feature using dlt, configured via a `replication` section in `dagsterization.yml`.
+  - Replication assets run as Dagster asset dependencies after their source dbt models are materialized.
+  - Creates and populates user-defined destination tables in Microsoft SQL Server.
+- Added row count metadata for dbt assets to improve observability in Dagster UI:
+  - Added `AssetObservation` events with `last_run_affected_row_count` metadata showing rows inserted/updated in the current run.
+  - Added `AssetObservation` events with `dagster/row_count` metadata showing total table row count after materialization.
+  - Row count observations include partition context via `partition` parameter for partitioned assets.
+  - Created `get_row_counts_from_starrocks()` helper in `dbt/row_counts.py` for direct database queries using relation metadata from manifest.
+
 ### Fixed
 
 ### Changed

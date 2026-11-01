@@ -7,11 +7,13 @@ These notes are intended to be a polished companion to `CHANGELOG.md`:
 - `CHANGELOG.md` remains the cumulative project history.
 - This document provides concise, version-by-version release summaries that are easy to reuse for GitHub Releases and upgrade communication.
 
-## Unreleased
+## v0.5.6
+
+Release date: 2026-11-01
 
 ### Summary
 
-StarRocks client timeouts are now configurable, and source observations are split into configurable batches to reduce per-run memory pressure in code locations with many sources. A new [environment configuration guide](docs/concepts/env.md) consolidates `.env` setup and reference material, with links from the documentation index and concepts overview.
+StarRocks client timeouts are now configurable, and source observations are split into configurable batches to reduce per-run memory pressure in code locations with many sources. A new [environment configuration guide](docs/concepts/env.md) consolidates `.env` setup and reference material, with links from the documentation index and concepts overview. Two review hardening fixes landed on PR #14 before merging: (1) the observation schedule factory no longer rebuilds the observable source assets a second time (it previously re-invoked the job factory just to read job names, duplicating work already done by `get_jobs()` / `get_assets()` on every code-location load); and (2) `STARROCKS_CONNECT_TIMEOUT` is now validated with a clear `ValueError` for non-integer, zero, or negative values, matching `LUBAN_OBSERVE_SOURCES_BATCH_SIZE`.
 
 ### Added
 
@@ -29,6 +31,11 @@ StarRocks client timeouts are now configurable, and source observations are spli
 - Covers all 51 variables in the generated `.env.example`, distinguishing template values from runtime defaults across Dagster/dbt, StarRocks, partitions, source observation, OpenTelemetry, SQL Server replication, and SSRS.
 - Explains dotenv loading precedence differences between generated code locations and CLI preparation, Python parser versus Make behavior, restart requirements, and common configuration errors.
 - Describes Kubernetes code-location/run-pod environment propagation and secret handling, including the existing GitOps export limitation that can place `SQLSERVER_PASSWORD` or custom secrets in ConfigMaps.
+
+### Fixed
+
+- **Redundant observable-source rebuild removed from the schedule path.** `get_observe_sources_schedules()` used to call `get_observe_sources_jobs()` only to read the generated job names, rebuilding every observable source asset a third time per code-location load (on top of `get_jobs()` and `get_assets()`). Job names are now produced by a shared `observe_job_names()` helper, so the generated job and schedule names are unchanged while the extra build is eliminated.
+- **`STARROCKS_CONNECT_TIMEOUT` validation.** Non-integer, zero, and negative values now raise a descriptive `ValueError` at resource construction instead of a bare `int()` error.
 
 ### Upgrade Notes
 

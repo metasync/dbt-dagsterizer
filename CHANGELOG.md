@@ -4,7 +4,7 @@ All notable changes to `dbt-dagsterizer` will be documented in this file.
 
 The format is based on Keep a Changelog, and this project adheres to Semantic Versioning.
 
-## [Unreleased]
+## [0.5.6] - 2026-11-01
 
 ### Added
 
@@ -19,6 +19,11 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 - All observation batch schedules share `LUBAN_OBSERVE_SOURCES_CRON` (default `*/5 * * * *`) and the global orchestration timezone, and default to RUNNING. Each batch job retains Kubernetes run-environment injection tags. Deployments with multiple batches must review references to the former single job/schedule names and run-concurrency limits.
 - The generated `.env.example` now includes `STARROCKS_CONNECT_TIMEOUT=10` and `LUBAN_OBSERVE_SOURCES_BATCH_SIZE=5`, and describes the observation cron as shared across batches.
 - Linked the environment configuration guide from the documentation index and concepts overview.
+
+### Fixed
+
+- **Source observation schedules no longer rebuild the observable source assets.** The schedule factory previously re-invoked `get_observe_sources_jobs()` just to read the generated job names, re-running `load_filtered_observable_sources()` and `build_observable_source_assets()` on top of the builds already performed by `get_jobs()` and `get_assets()` on every code-location load. Job names are now derived from a shared `observe_job_names()` helper keyed on the source count, removing the redundant third build with no change to the generated job/schedule names.
+- **`STARROCKS_CONNECT_TIMEOUT` is now validated.** A non-integer, zero, or negative value raises a clear `ValueError` at resource construction instead of the previous opaque `int()` conversion error, matching the validation already applied to `LUBAN_OBSERVE_SOURCES_BATCH_SIZE`.
 
 ## [0.5.5] - 2026-10-09
 

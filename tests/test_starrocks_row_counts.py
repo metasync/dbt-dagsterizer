@@ -50,6 +50,16 @@ def test_starrocks_connect_timeout(
     mock_connect.return_value.close.assert_called_once_with()
 
 
+@pytest.mark.parametrize("timeout", ["0", "-5", "1.5", "invalid", ""])
+def test_starrocks_reject_invalid_connect_timeout(monkeypatch, timeout):
+    monkeypatch.setenv("STARROCKS_CONNECT_TIMEOUT", timeout)
+
+    with pytest.raises(
+        ValueError, match="STARROCKS_CONNECT_TIMEOUT must be a positive integer"
+    ):
+        make_starrocks_resource()
+
+
 def test_get_row_counts_from_starrocks():
     """Test querying StarRocks for row counts."""
     node = {

@@ -56,10 +56,17 @@ class StarRocksClient:
 
 
 def make_starrocks_resource() -> StarRocksClient:
+    try:
+        connect_timeout = int(os.getenv("STARROCKS_CONNECT_TIMEOUT", "10"))
+    except ValueError:
+        raise ValueError("STARROCKS_CONNECT_TIMEOUT must be a positive integer") from None
+    if connect_timeout <= 0:
+        raise ValueError("STARROCKS_CONNECT_TIMEOUT must be a positive integer")
+
     return StarRocksClient(
         host=os.getenv("STARROCKS_HOST", "localhost"),
         port=int(os.getenv("STARROCKS_PORT", "9030")),
         user=os.getenv("STARROCKS_USER", "root"),
         password=os.getenv("STARROCKS_PASSWORD", ""),
-        connect_timeout=int(os.getenv("STARROCKS_CONNECT_TIMEOUT", "10")),
+        connect_timeout=connect_timeout,
     )

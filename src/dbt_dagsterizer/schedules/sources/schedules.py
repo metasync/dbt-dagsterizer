@@ -29,21 +29,30 @@ def _get_global_timezone() -> str:
 
 
 def get_observe_sources_schedules():
-    from ...jobs.sources.jobs import get_observe_sources_jobs
+    from ...assets.sources.automation import load_filtered_observable_sources
+    from ...jobs.sources.jobs import observe_job_names, resolve_observe_batch_size
 
-    jobs = get_observe_sources_jobs()
-    if not jobs:
+    batch_size = resolve_observe_batch_size()
+    job_names = observe_job_names(
+        asset_count=len(load_filtered_observable_sources()),
+        batch_size=batch_size,
+    )
+    if not job_names:
         return []
 
     cron_schedule = os.getenv("LUBAN_OBSERVE_SOURCES_CRON", "*/5 * * * *")
     execution_timezone = _get_global_timezone()
     return [
         ScheduleDefinition(
-            name="observe_sources_schedule" if len(jobs) == 1 else f"observe_sources_schedule_{i}",
+            name=(
+                "observe_sources_schedule"
+                if len(job_names) == 1
+                else f"observe_sources_schedule_{i}"
+            ),
             cron_schedule=cron_schedule,
-            job_name=job.name,
+            job_name=job_name,
             default_status=DefaultScheduleStatus.RUNNING,
             execution_timezone=execution_timezone,
         )
-        for i, job in enumerate(jobs, start=1)
+        for i, job_name in enumerate(job_names, start=1)
     ]
